@@ -1,6 +1,6 @@
 {
   "name": "roomos-macros-extension",
-  "displayName": "RoomOS Macros Extension",
+  "displayName": "RoomOS Macro Editor",
   "description": "Edit Cisco codec macros directly from VS Code",
   "version": "0.0.1",
   "publisher": "ZacharieGignac",
@@ -112,6 +112,10 @@
       {
         "command": "ciscoCodec.manageProfiles",
         "title": "Settings"
+      },
+      {
+        "command": "ciscoCodec.resetExtensionData",
+        "title": "Codec: Reset Extension Data"
       }
     ],
     "menus": {

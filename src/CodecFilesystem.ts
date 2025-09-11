@@ -21,14 +21,25 @@ export class CodecFileSystem implements vscode.FileSystemProvider {
   }
 
   async readDirectory(): Promise<[string, vscode.FileType][]> {
-    const list = await this.manager.list();
-    return list.map((m: any) => [m.Name + '.js', vscode.FileType.File]);
+    try {
+      const list = await this.manager.list();
+      return list.map((m: any) => [m.Name + '.js', vscode.FileType.File]);
+    } catch (err: any) {
+      vscode.window.showErrorMessage('Failed to list macros: ' + (err?.message || String(err)));
+      return [];
+    }
   }
 
   async readFile(uri: vscode.Uri): Promise<Uint8Array> {
-    const name = uri.path.replace(/^\//, '').replace(/\.js$/, '');
-    const content = await this.manager.get(name);
-    return Buffer.from(content, 'utf-8');
+    try {
+      const name = uri.path.replace(/^\//, '').replace(/\.js$/, '');
+      const content = await this.manager.get(name);
+      return Buffer.from(content, 'utf-8');
+    } catch (err: any) {
+      const msg = err?.message || String(err);
+      vscode.window.showErrorMessage('Failed to open macro: ' + msg);
+      throw err;
+    }
   }
 
   async writeFile(uri: vscode.Uri, content: Uint8Array): Promise<void> {

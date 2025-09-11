@@ -36,6 +36,39 @@ async function activate(context) {
             vscode.window.showInformationMessage(`Added profile ${added.label}`);
         }
     }));
+    // Reset all stored data (profiles + secrets + legacy settings)
+    context.subscriptions.push(vscode.commands.registerCommand('ciscoCodec.resetExtensionData', async () => {
+        const confirm = await vscode.window.showWarningMessage('Remove all saved codec profiles and passwords from this machine?', { modal: true }, 'Reset');
+        if (confirm !== 'Reset')
+            return;
+        try {
+            const list = await profiles.listProfiles();
+            for (const p of list) {
+                await profiles.removeProfile(p.id);
+            }
+            // Clear legacy settings at all scopes
+            const cfg = vscode.workspace.getConfiguration('codec');
+            const keys = ['host', 'username', 'password'];
+            for (const key of keys) {
+                try {
+                    await cfg.update(key, undefined, vscode.ConfigurationTarget.Global);
+                }
+                catch { }
+                try {
+                    await cfg.update(key, undefined, vscode.ConfigurationTarget.Workspace);
+                }
+                catch { }
+                try {
+                    await cfg.update(key, undefined, vscode.ConfigurationTarget.WorkspaceFolder);
+                }
+                catch { }
+            }
+            vscode.window.showInformationMessage('RoomOS Macros: All saved profiles and credentials removed. Please restart the editor.');
+        }
+        catch (e) {
+            vscode.window.showErrorMessage('Failed to reset data: ' + (e?.message || String(e)));
+        }
+    }));
     // Initialize schema service EARLY so Settings webview can query status/known products
     const schemaService = new SchemaService_1.SchemaService(context);
     context.subscriptions.push(vscode.commands.registerCommand('ciscoCodec.refreshSchema', async () => {
@@ -120,9 +153,22 @@ async function activate(context) {
     if (hostVal && userVal && passVal) {
         await profiles.addProfile(hostVal, hostVal, userVal, passVal);
         try {
-            await config.update('host', undefined, vscode.ConfigurationTarget.Global);
-            await config.update('username', undefined, vscode.ConfigurationTarget.Global);
-            await config.update('password', undefined, vscode.ConfigurationTarget.Global);
+            // Clear at all scopes since value may come from workspace or folder
+            const targets = [vscode.ConfigurationTarget.Global, vscode.ConfigurationTarget.Workspace, vscode.ConfigurationTarget.WorkspaceFolder];
+            for (const t of targets) {
+                try {
+                    await config.update('host', undefined, t);
+                }
+                catch { }
+                try {
+                    await config.update('username', undefined, t);
+                }
+                catch { }
+                try {
+                    await config.update('password', undefined, t);
+                }
+                catch { }
+            }
         }
         catch (err) {
             // Surface configuration write issues without breaking activation
@@ -360,13 +406,18 @@ async function activate(context) {
             const effectiveManager = connected;
             currentManager = effectiveManager;
             currentProfileId = selected.id;
-            if (!provider) {
-                provider = new CodecFilesystem_1.CodecFileSystem(currentManager);
+            // Re-register provider to ensure fresh handle after reconnect
+            try {
+                if (provider) {
+                    provider.setManager(currentManager);
+                }
+                else {
+                    provider = new CodecFilesystem_1.CodecFileSystem(currentManager);
+                }
+                // Re-register regardless to refresh the scheme binding
                 context.subscriptions.push(vscode.workspace.registerFileSystemProvider('codecfs', provider, { isCaseSensitive: true }));
             }
-            else {
-                provider.setManager(currentManager);
-            }
+            catch { }
             if (!treeProvider) {
                 treeProvider = new MacroTreeProvider_1.MacroTreeProvider(currentManager);
                 vscode.window.registerTreeDataProvider('codecMacrosExplorer', treeProvider);

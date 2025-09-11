@@ -17,13 +17,26 @@ class CodecFileSystem {
         return { type: vscode.FileType.File, ctime: Date.now(), mtime: Date.now(), size: 0 };
     }
     async readDirectory() {
-        const list = await this.manager.list();
-        return list.map((m) => [m.Name + '.js', vscode.FileType.File]);
+        try {
+            const list = await this.manager.list();
+            return list.map((m) => [m.Name + '.js', vscode.FileType.File]);
+        }
+        catch (err) {
+            vscode.window.showErrorMessage('Failed to list macros: ' + (err?.message || String(err)));
+            return [];
+        }
     }
     async readFile(uri) {
-        const name = uri.path.replace(/^\//, '').replace(/\.js$/, '');
-        const content = await this.manager.get(name);
-        return Buffer.from(content, 'utf-8');
+        try {
+            const name = uri.path.replace(/^\//, '').replace(/\.js$/, '');
+            const content = await this.manager.get(name);
+            return Buffer.from(content, 'utf-8');
+        }
+        catch (err) {
+            const msg = err?.message || String(err);
+            vscode.window.showErrorMessage('Failed to open macro: ' + msg);
+            throw err;
+        }
     }
     async writeFile(uri, content) {
         const name = uri.path.replace(/^\//, '').replace(/\.js$/, '');

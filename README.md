@@ -1,4 +1,4 @@
-## RoomOS Macros – VS Code Extension
+## RoomOS Macro Editor – VS Code Extension
 
 Edit and manage Cisco RoomOS codec macros directly from VS Code. Browse, open, edit, create, rename, activate/deactivate, and remove macros on your device, with multi‑codec profile support and a virtual filesystem.
 

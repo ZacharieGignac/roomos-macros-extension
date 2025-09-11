@@ -37,6 +37,34 @@ export async function activate(context: vscode.ExtensionContext) {
       }
     })
   );
+  // Reset all stored data (profiles + secrets + legacy settings)
+  context.subscriptions.push(
+    vscode.commands.registerCommand('ciscoCodec.resetExtensionData', async () => {
+      const confirm = await vscode.window.showWarningMessage(
+        'Remove all saved codec profiles and passwords from this machine?',
+        { modal: true },
+        'Reset'
+      );
+      if (confirm !== 'Reset') return;
+      try {
+        const list = await profiles.listProfiles();
+        for (const p of list) {
+          await profiles.removeProfile(p.id);
+        }
+        // Clear legacy settings at all scopes
+        const cfg = vscode.workspace.getConfiguration('codec');
+        const keys = ['host','username','password'] as const;
+        for (const key of keys) {
+          try { await cfg.update(key, undefined, vscode.ConfigurationTarget.Global); } catch {}
+          try { await cfg.update(key, undefined, vscode.ConfigurationTarget.Workspace); } catch {}
+          try { await cfg.update(key, undefined, vscode.ConfigurationTarget.WorkspaceFolder); } catch {}
+        }
+        vscode.window.showInformationMessage('RoomOS Macros: All saved profiles and credentials removed. Please restart the editor.');
+      } catch (e: any) {
+        vscode.window.showErrorMessage('Failed to reset data: ' + (e?.message || String(e)));
+      }
+    })
+  );
   // Initialize schema service EARLY so Settings webview can query status/known products
   const schemaService = new SchemaService(context);
   context.subscriptions.push(
@@ -129,9 +157,13 @@ export async function activate(context: vscode.ExtensionContext) {
   if (hostVal && userVal && passVal) {
     await profiles.addProfile(hostVal, hostVal, userVal, passVal);
     try {
-      await config.update('host', undefined, vscode.ConfigurationTarget.Global);
-      await config.update('username', undefined, vscode.ConfigurationTarget.Global);
-      await config.update('password', undefined, vscode.ConfigurationTarget.Global);
+      // Clear at all scopes since value may come from workspace or folder
+      const targets = [vscode.ConfigurationTarget.Global, vscode.ConfigurationTarget.Workspace, vscode.ConfigurationTarget.WorkspaceFolder];
+      for (const t of targets) {
+        try { await config.update('host', undefined, t); } catch {}
+        try { await config.update('username', undefined, t); } catch {}
+        try { await config.update('password', undefined, t); } catch {}
+      }
     } catch (err: any) {
       // Surface configuration write issues without breaking activation
       vscode.window.showWarningMessage(`Failed to clear legacy codec settings: ${err?.message || String(err)}`);
@@ -379,14 +411,18 @@ export async function activate(context: vscode.ExtensionContext) {
         currentManager = effectiveManager;
         currentProfileId = selected.id;
 
-        if (!provider) {
-          provider = new CodecFileSystem(currentManager);
+        // Re-register provider to ensure fresh handle after reconnect
+        try {
+          if (provider) {
+            provider.setManager(currentManager);
+          } else {
+            provider = new CodecFileSystem(currentManager);
+          }
+          // Re-register regardless to refresh the scheme binding
           context.subscriptions.push(
             vscode.workspace.registerFileSystemProvider('codecfs', provider, { isCaseSensitive: true })
           );
-        } else {
-          provider.setManager(currentManager);
-        }
+        } catch {}
 
         if (!treeProvider) {
           treeProvider = new MacroTreeProvider(currentManager);
