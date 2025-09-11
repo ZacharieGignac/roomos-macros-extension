@@ -48,9 +48,13 @@ Codec Macros explorer and editor:
 
 ![Editor](images/screenshot_editor.png)
 
-Profiles and settings webview:
+Context menu:
 
 ![Settings](images/screenshot_contextmenu.png)
+
+Settings panel:
+
+![Settings Panel](images/screenshot_settings.png)
 
 ### Explorer actions (context menu)
 
