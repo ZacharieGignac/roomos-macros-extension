@@ -34,7 +34,7 @@ Edit and manage Cisco RoomOS codec macros directly from VS Code. Browse, open, e
 ### Getting started
 
 1. Open the Codec Macros explorer (Activity Bar → Explorer → Codec Macros)
-2. Manage profiles (devices) via the view toolbar → “Manage Codec Profiles”
+2. Manage profiles (devices) via the view toolbar → “Settings”
    - Add profiles by specifying Label, Host, Username, Password
    - Set Active to pick the current device; switching connects seamlessly
    - Passwords are stored in VS Code Secrets; host/username/label in global storage
