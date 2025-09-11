@@ -1,0 +1,180 @@
+{
+  "name": "roomos-macros-extension",
+  "displayName": "RoomOS Macros Extension",
+  "description": "Edit Cisco codec macros directly from VS Code",
+  "version": "0.0.1",
+  "publisher": "ZacharieGignac",
+  "license": "MIT",
+  "icon": "images/icon.png",
+  "engines": {
+    "vscode": "^1.70.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onView:codecMacrosExplorer",
+    "onCommand:ciscoCodec.openMacro",
+    "onCommand:ciscoCodec.deleteMacro",
+    "onCommand:ciscoCodec.renameMacro",
+    "onCommand:ciscoCodec.activateMacro",
+    "onCommand:ciscoCodec.deactivateMacro",
+    "onCommand:ciscoCodec.restartMacroFramework",
+    "onCommand:ciscoCodec.addProfile",
+    "onCommand:ciscoCodec.switchProfile",
+    "onCommand:ciscoCodec.createMacro",
+    "onCommand:ciscoCodec.manageProfiles",
+    "onFileSystem:codecfs"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "views": {
+      "explorer": [
+        {
+          "id": "codecMacrosExplorer",
+          "name": "RoomOS Macros"
+        }
+      ]
+    },
+    "configuration": {
+      "properties": {
+        "codec.host": {
+          "type": "string",
+          "description": "Codec IP address"
+        },
+        "codec.username": {
+          "type": "string",
+          "description": "Codec username"
+        },
+        "codec.password": {
+          "type": "string",
+          "description": "Codec password"
+        },
+        "codec.autoRestartOnSave": {
+          "type": "boolean",
+          "default": false,
+          "description": "Automatically restart macro framework when saving a macro"
+        },
+        "codec.forcedProduct": {
+          "type": "string",
+          "default": "auto",
+          "description": "Force a specific product for xAPI schema filtering (use 'auto' to detect)"
+        },
+        "codec.confirmMacroDelete": {
+          "type": "boolean",
+          "default": true,
+          "description": "Ask for confirmation before deleting a macro"
+        },
+        "codec.confirmFrameworkRestart": {
+          "type": "boolean",
+          "default": true,
+          "description": "Ask for confirmation before restarting the Macro Framework"
+        }
+      }
+    },
+    "commands": [
+      {
+        "command": "ciscoCodec.openMacro",
+        "title": "Open Macro"
+      },
+      {
+        "command": "ciscoCodec.deleteMacro",
+        "title": "Remove Macro"
+      },
+      {
+        "command": "ciscoCodec.renameMacro",
+        "title": "Rename Macro"
+      },
+      {
+        "command": "ciscoCodec.activateMacro",
+        "title": "Activate Macro"
+      },
+      {
+        "command": "ciscoCodec.deactivateMacro",
+        "title": "Deactivate Macro"
+      },
+      {
+        "command": "ciscoCodec.restartMacroFramework",
+        "title": "Restart Macro Framework"
+      },
+      {
+        "command": "ciscoCodec.addProfile",
+        "title": "Codec: Add Codec Profile"
+      },
+      {
+        "command": "ciscoCodec.switchProfile",
+        "title": "Codec: Switch Codec Profile"
+      },
+      {
+        "command": "ciscoCodec.createMacro",
+        "title": "Create Macro"
+      },
+      {
+        "command": "ciscoCodec.manageProfiles",
+        "title": "Settings"
+      }
+    ],
+    "menus": {
+      "view/item/context": [
+        {
+          "command": "ciscoCodec.createMacro",
+          "when": "view == codecMacrosExplorer",
+          "group": "1_create"
+        },
+        {
+          "command": "ciscoCodec.restartMacroFramework",
+          "when": "view == codecMacrosExplorer",
+          "group": "0_restart@0"
+        },
+        {
+          "command": "ciscoCodec.renameMacro",
+          "when": "view == codecMacrosExplorer && viewItem =~ /macro:.*/",
+          "group": "2_modification"
+        },
+        {
+          "command": "ciscoCodec.deleteMacro",
+          "when": "view == codecMacrosExplorer && viewItem =~ /macro:.*/",
+          "group": "2_modification"
+        },
+        {
+          "command": "ciscoCodec.activateMacro",
+          "when": "view == codecMacrosExplorer && viewItem == macro:inactive",
+          "group": "3_state"
+        },
+        {
+          "command": "ciscoCodec.deactivateMacro",
+          "when": "view == codecMacrosExplorer && viewItem == macro:active",
+          "group": "3_state"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "ciscoCodec.manageProfiles",
+          "when": "view == codecMacrosExplorer",
+          "group": "navigation@0"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run build",
+    "compile": "tsc -p ./ --noEmit",
+    "build": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run build",
+    "test": "node ./out/test/runTest.js"
+  },
+  "devDependencies": {
+    "@types/node": "^18.0.0",
+    "@types/vscode": "^1.70.0",
+    "typescript": "^5.0.0",
+    "vsce": "^2.14.0"
+  },
+  "dependencies": {
+    "jsxapi": "^6.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ZacharieGignac/roomos-macros-extension.git"
+  }
+}

@@ -1,0 +1,23 @@
+# Exclude sources and build artifacts not needed at runtime
+.vscode/**
+.vscode-test/**
+.github/**
+.git/**
+
+# TypeScript sources and maps
+src/**
+**/*.ts
+**/*.map
+tsconfig.json
+
+# Tests and tooling
+out/test/**
+test/**
+**/jest.config.*
+.eslintrc*
+.prettierrc*
+.editorconfig
+
+# Misc
+*.log
+**/.DS_Store
