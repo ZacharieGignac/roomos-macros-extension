@@ -77,4 +77,9 @@ export class MacroManager {
   async rename(oldName: string, newName: string): Promise<void> {
     await this.xapi.Command.Macros.Macro.Rename({ Name: oldName, NewName: newName });
   }
+
+  async verifyConnection(): Promise<void> {
+    // Perform a simple read that requires valid credentials
+    await (this.xapi as any).Status.SystemUnit.ProductId.get();
+  }
 }

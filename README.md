@@ -42,6 +42,16 @@ Edit and manage Cisco RoomOS codec macros directly from VS Code. Browse, open, e
 4. Click a macro to open it. Edit as desired and press Ctrl+S to save
    - On save you’ll see “Saved macro <name>” and the “unsaved” badge clears
 
+### Screenshots
+
+Codec Macros explorer and editor:
+
+![Editor](images/screenshot_editor.png)
+
+Profiles and settings webview:
+
+![Settings](images/screenshot_contextmenu.png)
+
 ### Explorer actions (context menu)
 
 - Create Macro: prompts for a name, creates an empty macro, opens it
@@ -98,8 +108,12 @@ Use at your own risk. Test changes in non‑production environments first.
 
 ### Development scripts
 
-- Build once: `npm run compile`
+- Install deps: `npm install`
+- Build once: `npm run build`
 - Watch build: `npm run watch`
+- Package VSIX: `npx vsce package`
+
+After building or packaging, reload the VS Code window or install the generated `.vsix` (e.g., `roomos-macros-extension-*.vsix`) via the Extensions view three‑dot menu → “Install from VSIX…”.
 
 ### License
 

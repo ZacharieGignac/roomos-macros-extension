@@ -36,97 +36,12 @@ async function activate(context) {
             vscode.window.showInformationMessage(`Added profile ${added.label}`);
         }
     }));
-    // Only import profile from settings if values are explicitly set (not defaults)
-    const hostInfo = config.inspect('host');
-    const userInfo = config.inspect('username');
-    const passInfo = config.inspect('password');
-    const hostVal = hostInfo?.workspaceValue ?? hostInfo?.globalValue ?? hostInfo?.workspaceFolderValue;
-    const userVal = userInfo?.workspaceValue ?? userInfo?.globalValue ?? userInfo?.workspaceFolderValue;
-    const passVal = passInfo?.workspaceValue ?? passInfo?.globalValue ?? passInfo?.workspaceFolderValue;
-    if (hostVal && userVal && passVal) {
-        await profiles.addProfile(hostVal, hostVal, userVal, passVal);
-        try {
-            await config.update('host', undefined, vscode.ConfigurationTarget.Global);
-            await config.update('username', undefined, vscode.ConfigurationTarget.Global);
-            await config.update('password', undefined, vscode.ConfigurationTarget.Global);
-        }
-        catch (err) {
-            // Surface configuration write issues without breaking activation
-            vscode.window.showWarningMessage(`Failed to clear legacy codec settings: ${err?.message || String(err)}`);
-            console.error('Failed to clear legacy codec settings', err);
-        }
-    }
-    const all = await profiles.listProfiles();
-    if (all.length === 0) {
-        vscode.window.showWarningMessage('No codec profiles configured. Use "Codec: Add Codec Profile" from the view toolbar.');
-    }
-    else {
-        const activeId = (await profiles.getActiveProfileId()) || all[0].id;
-        await profiles.setActiveProfileId(activeId);
-        const active = all.find(p => p.id === activeId);
-        const pass = (await profiles.getPassword(active.id)) || '';
-        const manager = new MacroManager_1.MacroManager(active.host, active.username, pass);
-        currentManager = manager;
-        currentProfileId = active.id;
-        try {
-            await vscode.window.withProgress({ location: vscode.ProgressLocation.Window, title: `Connecting to ${active.host}…` }, async () => {
-                await manager.connect();
-            });
-            vscode.window.showInformationMessage(`Connected to codec at ${active.host}`);
-        }
-        catch (err) {
-            vscode.window.showErrorMessage(`Failed to connect to codec: ${err.message || err}`);
-            console.error("Connection error:", err);
-        }
-        // Register filesystem
-        provider = new CodecFilesystem_1.CodecFileSystem(currentManager);
-        context.subscriptions.push(vscode.workspace.registerFileSystemProvider('codecfs', provider, {
-            isCaseSensitive: true
-        }));
-        // Register explorer view
-        treeProvider = new MacroTreeProvider_1.MacroTreeProvider(currentManager);
-        vscode.window.registerTreeDataProvider('codecMacrosExplorer', treeProvider);
-    }
-    // Track dirty macros (unsaved editor changes)
-    const dirty = new Set();
-    function updateDirtyState() {
-        dirty.clear();
-        for (const doc of vscode.workspace.textDocuments) {
-            if (doc.uri.scheme === 'codecfs' && doc.isDirty) {
-                const name = doc.uri.path.replace(/^\//, '').replace(/\.js$/, '');
-                dirty.add(name);
-            }
-        }
-        if (treeProvider) {
-            treeProvider.setDirtySet(dirty);
-        }
-    }
-    context.subscriptions.push(vscode.workspace.onDidChangeTextDocument(e => {
-        if (e.document.uri.scheme === 'codecfs')
-            updateDirtyState();
-    }), vscode.workspace.onDidSaveTextDocument(doc => {
-        if (doc.uri.scheme === 'codecfs')
-            updateDirtyState();
-    }), vscode.workspace.onDidOpenTextDocument(doc => {
-        if (doc.uri.scheme === 'codecfs')
-            updateDirtyState();
-    }), vscode.workspace.onDidCloseTextDocument(doc => {
-        if (doc.uri.scheme === 'codecfs')
-            updateDirtyState();
-    }));
-    updateDirtyState();
-    // Preload xAPI schema with a progress message, then register language features
+    // Initialize schema service EARLY so Settings webview can query status/known products
     const schemaService = new SchemaService_1.SchemaService(context);
-    await vscode.window.withProgress({ location: vscode.ProgressLocation.Window, title: 'Getting xAPI schema…' }, async () => {
-        await schemaService.preload();
-    });
-    (0, XapiLanguage_1.registerLanguageFeatures)(context, schemaService);
-    // Expose schema service to settings webview via commands/messages
     context.subscriptions.push(vscode.commands.registerCommand('ciscoCodec.refreshSchema', async () => {
         await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: 'Refreshing xAPI schema…' }, async () => {
             await schemaService.refresh();
         });
-        // Notify settings webview to update immediately
         await vscode.commands.executeCommand('ciscoCodec.manageProfiles');
         vscode.window.showInformationMessage('xAPI schema refreshed');
     }), vscode.commands.registerCommand('ciscoCodec.showSchemaJson', async () => {
@@ -193,6 +108,87 @@ async function activate(context) {
         list.sort((a, b) => a.label.localeCompare(b.label));
         return list;
     }));
+    // Register early so Settings webview can invoke it safely
+    context.subscriptions.push(vscode.commands.registerCommand('ciscoCodec.reloadForActiveProfile', reloadForActiveProfileHandler));
+    // Only import profile from settings if values are explicitly set (not defaults)
+    const hostInfo = config.inspect('host');
+    const userInfo = config.inspect('username');
+    const passInfo = config.inspect('password');
+    const hostVal = hostInfo?.workspaceValue ?? hostInfo?.globalValue ?? hostInfo?.workspaceFolderValue;
+    const userVal = userInfo?.workspaceValue ?? userInfo?.globalValue ?? userInfo?.workspaceFolderValue;
+    const passVal = passInfo?.workspaceValue ?? passInfo?.globalValue ?? passInfo?.workspaceFolderValue;
+    if (hostVal && userVal && passVal) {
+        await profiles.addProfile(hostVal, hostVal, userVal, passVal);
+        try {
+            await config.update('host', undefined, vscode.ConfigurationTarget.Global);
+            await config.update('username', undefined, vscode.ConfigurationTarget.Global);
+            await config.update('password', undefined, vscode.ConfigurationTarget.Global);
+        }
+        catch (err) {
+            // Surface configuration write issues without breaking activation
+            vscode.window.showWarningMessage(`Failed to clear legacy codec settings: ${err?.message || String(err)}`);
+            console.error('Failed to clear legacy codec settings', err);
+        }
+    }
+    const all = await profiles.listProfiles();
+    if (all.length === 0) {
+        vscode.window.showWarningMessage('No codec profiles configured. Use "Codec: Add Codec Profile" from the view toolbar.');
+    }
+    else {
+        const activeId = (await profiles.getActiveProfileId()) || all[0].id;
+        await profiles.setActiveProfileId(activeId);
+        const active = all.find(p => p.id === activeId);
+        const pass = (await profiles.getPassword(active.id)) || '';
+        const manager = new MacroManager_1.MacroManager(active.host, active.username, pass);
+        currentManager = manager;
+        currentProfileId = active.id;
+        const connectedManager = await connectWithHandling(manager, active);
+        if (connectedManager) {
+            currentManager = connectedManager;
+            vscode.window.showInformationMessage(`Connected to codec at ${active.host}`);
+        }
+        // Register filesystem
+        provider = new CodecFilesystem_1.CodecFileSystem(currentManager);
+        context.subscriptions.push(vscode.workspace.registerFileSystemProvider('codecfs', provider, {
+            isCaseSensitive: true
+        }));
+        // Register explorer view
+        treeProvider = new MacroTreeProvider_1.MacroTreeProvider(currentManager);
+        vscode.window.registerTreeDataProvider('codecMacrosExplorer', treeProvider);
+    }
+    // Track dirty macros (unsaved editor changes)
+    const dirty = new Set();
+    function updateDirtyState() {
+        dirty.clear();
+        for (const doc of vscode.workspace.textDocuments) {
+            if (doc.uri.scheme === 'codecfs' && doc.isDirty) {
+                const name = doc.uri.path.replace(/^\//, '').replace(/\.js$/, '');
+                dirty.add(name);
+            }
+        }
+        if (treeProvider) {
+            treeProvider.setDirtySet(dirty);
+        }
+    }
+    context.subscriptions.push(vscode.workspace.onDidChangeTextDocument(e => {
+        if (e.document.uri.scheme === 'codecfs')
+            updateDirtyState();
+    }), vscode.workspace.onDidSaveTextDocument(doc => {
+        if (doc.uri.scheme === 'codecfs')
+            updateDirtyState();
+    }), vscode.workspace.onDidOpenTextDocument(doc => {
+        if (doc.uri.scheme === 'codecfs')
+            updateDirtyState();
+    }), vscode.workspace.onDidCloseTextDocument(doc => {
+        if (doc.uri.scheme === 'codecfs')
+            updateDirtyState();
+    }));
+    updateDirtyState();
+    // Preload xAPI schema with a progress message, then register language features
+    await vscode.window.withProgress({ location: vscode.ProgressLocation.Window, title: 'Getting xAPI schema…' }, async () => {
+        await schemaService.preload();
+    });
+    (0, XapiLanguage_1.registerLanguageFeatures)(context, schemaService);
     // Apply forced product if set, otherwise detect from device
     {
         const fp = vscode.workspace.getConfiguration('codec').get('forcedProduct', 'auto');
@@ -329,7 +325,7 @@ async function activate(context) {
         return true;
     }
     // Register command to open a macro using our virtual FS
-    context.subscriptions.push(vscode.commands.registerCommand('ciscoCodec.reloadForActiveProfile', async () => {
+    async function reloadForActiveProfileHandler() {
         try {
             // Prevent switching if there are unsaved codec macros
             const listBefore = await profiles.listProfiles();
@@ -356,10 +352,13 @@ async function activate(context) {
             }
             const password = (await profiles.getPassword(selected.id)) || '';
             const newManager = new MacroManager_1.MacroManager(selected.host, selected.username, password);
-            await vscode.window.withProgress({ location: vscode.ProgressLocation.Window, title: `Connecting to ${selected.host}…` }, async () => {
-                await newManager.connect();
-            });
-            currentManager = newManager;
+            const connected = await connectWithHandling(newManager, selected);
+            if (!connected) {
+                // Keep using existing manager if connection failed
+                return;
+            }
+            const effectiveManager = connected;
+            currentManager = effectiveManager;
             currentProfileId = selected.id;
             if (!provider) {
                 provider = new CodecFilesystem_1.CodecFileSystem(currentManager);
@@ -387,7 +386,135 @@ async function activate(context) {
         catch (err) {
             vscode.window.showErrorMessage(`Failed to switch profile: ${err?.message || String(err)}`);
         }
-    }));
+    }
+    async function connectWithHandling(manager, profile) {
+        try {
+            await vscode.window.withProgress({ location: vscode.ProgressLocation.Window, title: `Connecting to ${profile.host}…` }, async () => {
+                await withTimeout(manager.connect(), 10000, 'connect');
+                // Verify credentials quickly to avoid false positives where socket opens but auth fails later
+                await withTimeout(manager.verifyConnection(), 5000, 'verify');
+            });
+            return manager;
+        }
+        catch (err) {
+            const category = categorizeConnectionError(err);
+            if (category === 'auth') {
+                const newPassword = await vscode.window.showInputBox({ prompt: `Authentication failed for ${profile.username}@${profile.host}. Enter password to retry:`, password: true, ignoreFocusOut: true });
+                if (newPassword === undefined) {
+                    vscode.window.showErrorMessage('Authentication failed. Update your password in Settings and try again.');
+                    return null;
+                }
+                try {
+                    await profiles.updateProfile(profile.id, {}, newPassword);
+                    const updatedPassword = (await profiles.getPassword(profile.id)) || '';
+                    const retryManager = new MacroManager_1.MacroManager(profile.host, profile.username, updatedPassword);
+                    await vscode.window.withProgress({ location: vscode.ProgressLocation.Window, title: `Reconnecting to ${profile.host}…` }, async () => {
+                        await withTimeout(retryManager.connect(), 10000, 'connect');
+                        await withTimeout(retryManager.verifyConnection(), 5000, 'verify');
+                    });
+                    return retryManager;
+                }
+                catch (retryErr) {
+                    vscode.window.showErrorMessage(`Failed to connect after updating password: ${retryErr?.message || String(retryErr)}`);
+                    return null;
+                }
+            }
+            if (category === 'tls') {
+                const choice = await vscode.window.showErrorMessage(`TLS certificate error connecting to ${profile.host}. Ensure the device has a valid certificate trusted by your system.`, 'Retry', 'Open Settings');
+                if (choice === 'Open Settings') {
+                    await vscode.commands.executeCommand('ciscoCodec.manageProfiles');
+                    return null;
+                }
+                if (choice === 'Retry') {
+                    try {
+                        await vscode.window.withProgress({ location: vscode.ProgressLocation.Window, title: `Reconnecting to ${profile.host}…` }, async () => {
+                            await withTimeout(manager.connect(), 10000, 'connect');
+                            await withTimeout(manager.verifyConnection(), 5000, 'verify');
+                        });
+                        return manager;
+                    }
+                    catch { }
+                }
+                return null;
+            }
+            if (category === 'unreachable' || category === 'timeout') {
+                const choice = await vscode.window.showErrorMessage(`Cannot reach ${profile.host}. Check hostname/IP, network/VPN, and firewall.`, 'Retry', 'Open Settings');
+                if (choice === 'Open Settings') {
+                    await vscode.commands.executeCommand('ciscoCodec.manageProfiles');
+                    return null;
+                }
+                if (choice === 'Retry') {
+                    try {
+                        await vscode.window.withProgress({ location: vscode.ProgressLocation.Window, title: `Reconnecting to ${profile.host}…` }, async () => {
+                            await withTimeout(manager.connect(), 10000, 'connect');
+                            await withTimeout(manager.verifyConnection(), 5000, 'verify');
+                        });
+                        return manager;
+                    }
+                    catch { }
+                }
+                return null;
+            }
+            vscode.window.showErrorMessage(`Failed to connect to codec: ${err?.message || String(err)}`);
+            return null;
+        }
+    }
+    function categorizeConnectionError(err) {
+        const message = (err?.message || '').toLowerCase();
+        const code = (err?.code || err?.errno || err?.cause?.code || '').toString().toUpperCase();
+        // Authentication
+        if (message.includes('auth') ||
+            message.includes('unauthorized') ||
+            message.includes('forbidden') ||
+            message.includes('login') ||
+            message.includes('password') ||
+            message.includes('401')) {
+            return 'auth';
+        }
+        // Unreachable / DNS / refused
+        if (code === 'ENOTFOUND' ||
+            code === 'EAI_AGAIN' ||
+            code === 'ECONNREFUSED' ||
+            code === 'EHOSTUNREACH' ||
+            code === 'ENETUNREACH' ||
+            message.includes('getaddrinfo') ||
+            message.includes('refused') ||
+            message.includes('unreachable')) {
+            return 'unreachable';
+        }
+        // Timeout
+        if (code === 'ETIMEDOUT' || message.includes('timed out') || message.includes('timeout')) {
+            return 'timeout';
+        }
+        // TLS / certificate
+        if (code === 'CERT_HAS_EXPIRED' ||
+            code === 'DEPTH_ZERO_SELF_SIGNED_CERT' ||
+            code === 'UNABLE_TO_VERIFY_LEAF_SIGNATURE' ||
+            message.includes('ssl') ||
+            message.includes('tls') ||
+            message.includes('certificate') ||
+            message.includes('self signed')) {
+            return 'tls';
+        }
+        return 'other';
+    }
+    function withTimeout(promise, ms, label) {
+        let timer;
+        const timeout = new Promise((_, reject) => {
+            timer = setTimeout(() => {
+                const err = new Error(`${label} timed out after ${ms}ms`);
+                err.code = 'ETIMEDOUT';
+                reject(err);
+            }, ms);
+        });
+        return Promise.race([promise, timeout]).then((val) => {
+            clearTimeout(timer);
+            return val;
+        }, (err) => {
+            clearTimeout(timer);
+            throw err;
+        });
+    }
     context.subscriptions.push(vscode.commands.registerCommand('ciscoCodec.openMacro', async (macroName) => {
         try {
             const uri = vscode.Uri.parse(`codecfs:/${macroName}.js`);

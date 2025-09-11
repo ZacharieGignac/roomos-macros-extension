@@ -57,6 +57,10 @@ class MacroManager {
     async rename(oldName, newName) {
         await this.xapi.Command.Macros.Macro.Rename({ Name: oldName, NewName: newName });
     }
+    async verifyConnection() {
+        // Perform a simple read that requires valid credentials
+        await this.xapi.Status.SystemUnit.ProductId.get();
+    }
 }
 exports.MacroManager = MacroManager;
 //# sourceMappingURL=MacroManager.js.map
