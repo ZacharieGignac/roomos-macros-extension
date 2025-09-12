@@ -7,23 +7,12 @@
   "license": "MIT",
   "icon": "images/icon.png",
   "engines": {
-    "vscode": "^1.70.0"
+    "vscode": "^1.75.0"
   },
   "categories": [
     "Other"
   ],
   "activationEvents": [
-    "onView:codecMacrosExplorer",
-    "onCommand:ciscoCodec.openMacro",
-    "onCommand:ciscoCodec.deleteMacro",
-    "onCommand:ciscoCodec.renameMacro",
-    "onCommand:ciscoCodec.activateMacro",
-    "onCommand:ciscoCodec.deactivateMacro",
-    "onCommand:ciscoCodec.restartMacroFramework",
-    "onCommand:ciscoCodec.addProfile",
-    "onCommand:ciscoCodec.switchProfile",
-    "onCommand:ciscoCodec.createMacro",
-    "onCommand:ciscoCodec.manageProfiles",
     "onFileSystem:codecfs"
   ],
   "main": "./out/extension.js",
@@ -52,8 +41,13 @@
         },
         "codec.autoRestartOnSave": {
           "type": "boolean",
-          "default": false,
+          "default": true,
           "description": "Automatically restart macro framework when saving a macro"
+        },
+        "codec.autoRestartOnActivateDeactivate": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically restart macro framework when activating or deactivating a macro"
         },
         "codec.forcedProduct": {
           "type": "string",
@@ -69,6 +63,16 @@
           "type": "boolean",
           "default": true,
           "description": "Ask for confirmation before restarting the Macro Framework"
+        },
+        "codec.applySchemaToIntellisense": {
+          "type": "boolean",
+          "default": true,
+          "description": "Apply xAPI schema to IntelliSense (completions and hovers)"
+        },
+        "codec.showSchemaHover": {
+          "type": "boolean",
+          "default": false,
+          "description": "Show schema help on hover while typing"
         }
       }
     },
@@ -116,6 +120,14 @@
       {
         "command": "ciscoCodec.resetExtensionData",
         "title": "Codec: Reset Extension Data"
+      },
+      {
+        "command": "ciscoCodec.showXapiHelp",
+        "title": "xAPI: Show Help for Symbol"
+      },
+      {
+        "command": "ciscoCodec.insertXapiStub",
+        "title": "xAPI: Insert Stub"
       }
     ],
     "menus": {
@@ -156,6 +168,18 @@
           "command": "ciscoCodec.manageProfiles",
           "when": "view == codecMacrosExplorer",
           "group": "navigation@0"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "ciscoCodec.showXapiHelp",
+          "when": "resourceScheme == codecfs && editorLangId =~ /(javascript|typescript|javascriptreact|typescriptreact)/",
+          "group": "navigation@9"
+        },
+        {
+          "command": "ciscoCodec.insertXapiStub",
+          "when": "resourceScheme == codecfs && editorLangId =~ /(javascript|typescript|javascriptreact|typescriptreact)/",
+          "group": "navigation@8"
         }
       ]
     }

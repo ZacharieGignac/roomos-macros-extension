@@ -4,7 +4,7 @@ import { CodecFileSystem } from './CodecFilesystem';
 import { MacroTreeProvider } from './MacroTreeProvider';
 import { ProfileStore, CodecProfileInfo } from './ProfileStore';
 import { ProfilesWebview } from './ProfilesWebview';
-import { registerLanguageFeatures } from './XapiLanguage';
+import { registerLanguageFeatures, parseXapiContext } from './XapiLanguage';
 import { SchemaService } from './SchemaService';
 
 export async function activate(context: vscode.ExtensionContext) {
@@ -15,9 +15,61 @@ export async function activate(context: vscode.ExtensionContext) {
   let currentProfileId: string | null = null;
   let provider: CodecFileSystem | null = null;
   let treeProvider: MacroTreeProvider | null = null;
+  let unbindManagerState: (() => void) | null = null;
+  let xapiHelpPanel: vscode.WebviewPanel | null = null;
+  const statusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
+  statusBar.name = 'RoomOS Macros';
+  statusBar.command = 'ciscoCodec.manageProfiles';
+  statusBar.text = '$(debug-disconnect) RoomOS: Disconnected';
+  statusBar.tooltip = 'Manage codec profiles';
+  statusBar.show();
+  function setConnectedContext(connected: boolean) {
+    vscode.commands.executeCommand('setContext', 'codec.connected', connected);
+  }
+  function bindManagerState(manager: MacroManager, host: string) {
+    if (unbindManagerState) unbindManagerState();
+    const update = () => {
+      const s = manager.getState();
+      if (s === 'ready') {
+        statusBar.text = '$(check) RoomOS: Connected';
+        statusBar.tooltip = `Connected to ${host}`;
+        setConnectedContext(true);
+      } else if (s === 'connecting') {
+        statusBar.text = '$(sync~spin) RoomOS: Connecting…';
+        statusBar.tooltip = `Connecting to ${host}`;
+        setConnectedContext(false);
+      } else if (s === 'reconnecting') {
+        statusBar.text = '$(sync~spin) RoomOS: Reconnecting…';
+        statusBar.tooltip = `Reconnecting to ${host}`;
+        setConnectedContext(false);
+      } else if (s === 'disconnected') {
+        statusBar.text = '$(debug-disconnect) RoomOS: Disconnected';
+        statusBar.tooltip = 'Manage codec profiles';
+        setConnectedContext(false);
+      } else if (s === 'error') {
+        statusBar.text = '$(error) RoomOS: Error';
+        statusBar.tooltip = `Connection error for ${host}`;
+        setConnectedContext(false);
+      } else {
+        statusBar.text = '$(gear) RoomOS';
+        statusBar.tooltip = 'RoomOS Macros';
+        setConnectedContext(false);
+      }
+    };
+    update();
+    const off = manager.onStateChange(() => update());
+    unbindManagerState = () => {
+      off();
+      unbindManagerState = null;
+    };
+  }
   const getManagerOrWarn = (): MacroManager | null => {
     if (!currentManager) {
       vscode.window.showWarningMessage('No active codec connection. Add and activate a profile in Settings.');
+      return null;
+    }
+    if (!currentManager.isConnected()) {
+      vscode.window.showWarningMessage('Codec is offline. Wait for connection or switch profile.');
       return null;
     }
     return currentManager;
@@ -30,10 +82,200 @@ export async function activate(context: vscode.ExtensionContext) {
     })
   );
   context.subscriptions.push(
+    vscode.commands.registerCommand('ciscoCodec.insertXapiStub', async () => {
+      const editor = vscode.window.activeTextEditor;
+      if (!editor || editor.document.uri.scheme !== 'codecfs') return;
+      const pos = editor.selection.active;
+      const linePrefix = editor.document.getText(new vscode.Range(pos.line, 0, pos.line, Number.MAX_SAFE_INTEGER)).slice(0, pos.character);
+      const ctx: any = parseXapiContext(linePrefix);
+      if (!ctx?.found || !ctx?.category) {
+        vscode.window.showInformationMessage('Place the cursor on an xapi path like xapi.Command.Audio.');
+        return;
+      }
+      let basePath: string = ctx.category;
+      const schema = new SchemaService(context);
+      for (const seg of ctx.completedSegments) {
+        const children = await schema.getChildrenMap(basePath);
+        if (!children) break;
+        const keys = Object.keys(children);
+        const match = keys.find(k => k.toLowerCase() === String(seg).toLowerCase());
+        basePath = match ? `${basePath}.${match}` : `${basePath}.${seg}`;
+      }
+      // Include current token if it uniquely matches
+      if (ctx.currentPartial) {
+        const children = await schema.getChildrenMap(basePath);
+        if (children) {
+          const keys = Object.keys(children);
+          const exact = keys.find(k => k.toLowerCase() === String(ctx.currentPartial).toLowerCase());
+          const matches = keys.filter(k => k.toLowerCase().startsWith(String(ctx.currentPartial).toLowerCase()));
+          const chosen = exact || (matches.length === 1 ? matches[0] : undefined);
+          if (chosen) basePath = `${basePath}.${chosen}`;
+        }
+      }
+      const node = await schema.getNodeSchema(basePath);
+      if (!node) {
+        vscode.window.showWarningMessage('No schema found for stub.');
+        return;
+      }
+      const meta = (node as any)?.attributes || node;
+      const type = (node as any)?.type || meta?.type || '';
+      let snippet = '';
+      if (type === 'Command') {
+        // Build command params object stub
+        const params = Array.isArray(meta?.params) ? (meta.params as any[]) : [];
+        const fields = params.map((p: any) => `${p.name}: ${JSON.stringify(p.default ?? '')}`).join(', ');
+        snippet = `xapi.Command.${basePath.split('.').slice(1).join('.')}({ ${fields} });`;
+      } else if (type === 'Config') {
+        snippet = `xapi.Config.${basePath.split('.').slice(1).join('.')} = $1;`;
+      } else if (type === 'Status') {
+        snippet = `const value = await xapi.Status.${basePath.split('.').slice(1).join('.')}.get();`;
+      } else if (type === 'Event') {
+        snippet = `xapi.Event.${basePath.split('.').slice(1).join('.')}.on((event) => {\n  // TODO: handle event\n});`;
+      } else {
+        snippet = `// xapi ${basePath}`;
+      }
+      // Replace the current xapi path token if present; otherwise insert at cursor
+      const lineText = editor.document.lineAt(pos.line).text;
+      const uptoCursor = lineText.slice(0, pos.character);
+      const startIdx = uptoCursor.lastIndexOf('xapi.');
+      if (startIdx >= 0) {
+        const replaceRange = new vscode.Range(pos.line, startIdx, pos.line, pos.character);
+        await editor.insertSnippet(new vscode.SnippetString(snippet), replaceRange);
+      } else {
+        await editor.insertSnippet(new vscode.SnippetString(snippet), editor.selection.start);
+      }
+    })
+  );
+  context.subscriptions.push(
+    vscode.commands.registerCommand('ciscoCodec.showXapiHelp', async () => {
+      const editor = vscode.window.activeTextEditor;
+      if (!editor || editor.document.uri.scheme !== 'codecfs') return;
+      const pos = editor.selection.active;
+      const linePrefix = editor.document.getText(new vscode.Range(pos.line, 0, pos.line, Number.MAX_SAFE_INTEGER)).slice(0, pos.character);
+      // Reuse language parse to find context
+      const ctx: any = parseXapiContext(linePrefix);
+      if (!ctx?.found || !ctx?.category) {
+        vscode.window.showInformationMessage('Place the cursor on an xapi path like xapi.Command.Audio.');
+        return;
+      }
+      let basePath: string = ctx.category;
+      const schema = new SchemaService(context);
+      for (const seg of ctx.completedSegments) {
+        const children = await schema.getChildrenMap(basePath);
+        if (!children) break;
+        const keys = Object.keys(children);
+        const match = keys.find(k => k.toLowerCase() === String(seg).toLowerCase());
+        basePath = match ? `${basePath}.${match}` : `${basePath}.${seg}`;
+      }
+      // Try to include the current token if it exactly matches a child, or uniquely matches as a prefix
+      if (ctx.currentPartial) {
+        const children = await schema.getChildrenMap(basePath);
+        if (children) {
+          const keys = Object.keys(children);
+          const exact = keys.find(k => k.toLowerCase() === String(ctx.currentPartial).toLowerCase());
+          if (exact) {
+            basePath = `${basePath}.${exact}`;
+          } else {
+            const matches = keys.filter(k => k.toLowerCase().startsWith(String(ctx.currentPartial).toLowerCase()));
+            if (matches.length === 1) {
+              basePath = `${basePath}.${matches[0]}`;
+            }
+          }
+        }
+      }
+      const node = await schema.getNodeSchema(basePath);
+      if (!node) {
+        vscode.window.showInformationMessage('No schema information found for current symbol.');
+        return;
+      }
+      const meta = (node as any)?.attributes || node;
+      const title = basePath;
+      const desc = meta?.description || meta?.help || '';
+      const kind = (node as any)?.type || meta?.type || '';
+      const access = meta?.access ? String(meta.access) : '';
+      const roles = Array.isArray(meta?.role) ? meta.role : undefined;
+      const params = Array.isArray(meta?.params) ? meta.params as any[] : undefined;
+      // Render as a single webview panel (no extra document tabs)
+      const htmlEscape = (s: string) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      const rows: string[] = [];
+      rows.push(`<div class="hdr"><span class="title">${htmlEscape(title)}</span>${kind ? `<span class="pill">${htmlEscape(kind)}</span>` : ''}</div>`);
+      const metaBits: string[] = [];
+      if (access) metaBits.push(`<span class="meta"><b>access</b>: ${htmlEscape(access)}</span>`);
+      if (roles && roles.length) metaBits.push(`<span class="meta"><b>roles</b>: ${roles.map(htmlEscape).join(', ')}</span>`);
+      if (metaBits.length) rows.push(`<div class="metaRow">${metaBits.join(' · ')}</div>`);
+      if (desc) rows.push(`<div class="desc">${htmlEscape(desc)}</div>`);
+      if (params && params.length) {
+        rows.push('<h3>Parameters</h3>');
+        rows.push('<table><thead><tr><th>Name</th><th class="r">Required</th><th>Default</th><th>Type</th><th>Values</th></tr></thead><tbody>');
+        for (const p of params) {
+          const name = p?.name ?? '';
+          const required = p?.required ? 'yes' : 'no';
+          const def = p?.default ?? '';
+          const vs = p?.valuespace || {};
+          let type = vs?.type || '';
+          let values = '';
+          if (Array.isArray(vs?.Values)) {
+            values = (vs.Values as any[]).map(htmlEscape).join(', ');
+            type = type || 'Literal';
+          } else {
+            const min = vs?.Min, max = vs?.Max, step = vs?.Step;
+            const bits = [min !== undefined ? `min ${htmlEscape(min)}` : '', max !== undefined ? `max ${htmlEscape(max)}` : '', step !== undefined ? `step ${htmlEscape(step)}` : ''].filter(Boolean).join(', ');
+            if (bits) values = bits;
+          }
+          rows.push(`<tr><td>${htmlEscape(name)}</td><td class="r">${htmlEscape(required)}</td><td>${htmlEscape(def)}</td><td>${htmlEscape(type)}</td><td>${values}</td></tr>`);
+        }
+        rows.push('</tbody></table>');
+      }
+
+      const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <style>
+    body { font-family: var(--vscode-font-family); color: var(--vscode-foreground); background: var(--vscode-editor-background); padding: 12px; }
+    .hdr { display:flex; align-items:center; gap:8px; margin-bottom:6px; }
+    .title { font-weight:600; font-size: 14px; }
+    .pill { background: var(--vscode-badge-background); color: var(--vscode-badge-foreground); border-radius: 8px; padding: 2px 8px; font-size: 11px; }
+    .metaRow { opacity: 0.85; margin-bottom: 8px; }
+    .meta b { font-weight: 600; }
+    .desc { white-space: pre-wrap; margin: 8px 0 10px; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { border: 1px solid var(--vscode-editorGroup-border); padding: 4px 6px; vertical-align: top; }
+    th { background: var(--vscode-editor-background); text-align: left; }
+    .r { text-align: right; }
+  </style>
+  <title>xAPI Help</title>
+  </head>
+  <body>
+    ${rows.join('\n')}
+  </body>
+</html>`;
+
+      if (xapiHelpPanel) {
+        xapiHelpPanel.title = 'xAPI Help';
+        xapiHelpPanel.webview.html = html;
+        xapiHelpPanel.reveal(vscode.ViewColumn.Beside);
+      } else {
+        xapiHelpPanel = vscode.window.createWebviewPanel('xapiHelp', 'xAPI Help', vscode.ViewColumn.Beside, { enableScripts: false, retainContextWhenHidden: true });
+        xapiHelpPanel.onDidDispose(() => { xapiHelpPanel = null; });
+        xapiHelpPanel.webview.html = html;
+      }
+    })
+  );
+  context.subscriptions.push(
     vscode.commands.registerCommand('ciscoCodec.addProfile', async () => {
       const added = await promptAddProfile(profiles);
       if (added) {
         vscode.window.showInformationMessage(`Added profile ${added.label}`);
+        try {
+          const listNow = await profiles.listProfiles();
+          if (listNow.length === 1) {
+            await profiles.setActiveProfileId(added.id);
+            await vscode.commands.executeCommand('ciscoCodec.reloadForActiveProfile');
+          }
+        } catch (e: any) {
+          vscode.window.showWarningMessage('Profile added, but failed to auto-connect: ' + (e?.message || String(e)));
+        }
       }
     })
   );
@@ -183,6 +425,7 @@ export async function activate(context: vscode.ExtensionContext) {
     const manager = new MacroManager(active.host, active.username, pass);
     currentManager = manager;
     currentProfileId = active.id;
+    bindManagerState(manager, active.host);
     const connectedManager = await connectWithHandling(manager, active);
     if (connectedManager) {
       currentManager = connectedManager;
@@ -401,6 +644,8 @@ export async function activate(context: vscode.ExtensionContext) {
           return;
         }
         const password = (await profiles.getPassword(selected.id)) || '';
+        // Cleanly disconnect previous manager before switching
+        try { await currentManager?.disconnect(); } catch {}
         const newManager = new MacroManager(selected.host, selected.username, password);
         const connected = await connectWithHandling(newManager, selected);
         if (!connected) {
@@ -410,6 +655,7 @@ export async function activate(context: vscode.ExtensionContext) {
         const effectiveManager = connected;
         currentManager = effectiveManager;
         currentProfileId = selected.id;
+        bindManagerState(effectiveManager, selected.host);
 
         // Re-register provider to ensure fresh handle after reconnect
         try {
@@ -447,8 +693,6 @@ export async function activate(context: vscode.ExtensionContext) {
     try {
       await vscode.window.withProgress({ location: vscode.ProgressLocation.Window, title: `Connecting to ${profile.host}…` }, async () => {
         await withTimeout(manager.connect(), 10000, 'connect');
-        // Verify credentials quickly to avoid false positives where socket opens but auth fails later
-        await withTimeout(manager.verifyConnection(), 5000, 'verify');
       });
       return manager;
     } catch (err: any) {
@@ -465,7 +709,6 @@ export async function activate(context: vscode.ExtensionContext) {
           const retryManager = new MacroManager(profile.host, profile.username, updatedPassword);
           await vscode.window.withProgress({ location: vscode.ProgressLocation.Window, title: `Reconnecting to ${profile.host}…` }, async () => {
             await withTimeout(retryManager.connect(), 10000, 'connect');
-            await withTimeout(retryManager.verifyConnection(), 5000, 'verify');
           });
           return retryManager;
         } catch (retryErr: any) {
@@ -487,7 +730,6 @@ export async function activate(context: vscode.ExtensionContext) {
           try {
             await vscode.window.withProgress({ location: vscode.ProgressLocation.Window, title: `Reconnecting to ${profile.host}…` }, async () => {
               await withTimeout(manager.connect(), 10000, 'connect');
-              await withTimeout(manager.verifyConnection(), 5000, 'verify');
             });
             return manager;
           } catch {}
@@ -508,7 +750,6 @@ export async function activate(context: vscode.ExtensionContext) {
           try {
             await vscode.window.withProgress({ location: vscode.ProgressLocation.Window, title: `Reconnecting to ${profile.host}…` }, async () => {
               await withTimeout(manager.connect(), 10000, 'connect');
-              await withTimeout(manager.verifyConnection(), 5000, 'verify');
             });
             return manager;
           } catch {}
@@ -523,18 +764,17 @@ export async function activate(context: vscode.ExtensionContext) {
   function categorizeConnectionError(err: any): 'auth' | 'unreachable' | 'timeout' | 'tls' | 'other' {
     const message = (err?.message || '').toLowerCase();
     const code = (err?.code || err?.errno || err?.cause?.code || '').toString().toUpperCase();
-    // Authentication
     if (
       message.includes('auth') ||
       message.includes('unauthorized') ||
       message.includes('forbidden') ||
       message.includes('login') ||
       message.includes('password') ||
-      message.includes('401')
+      message.includes('401') ||
+      message.includes('403')
     ) {
       return 'auth';
     }
-    // Unreachable / DNS / refused
     if (
       code === 'ENOTFOUND' ||
       code === 'EAI_AGAIN' ||
@@ -547,11 +787,9 @@ export async function activate(context: vscode.ExtensionContext) {
     ) {
       return 'unreachable';
     }
-    // Timeout
     if (code === 'ETIMEDOUT' || message.includes('timed out') || message.includes('timeout')) {
       return 'timeout';
     }
-    // TLS / certificate
     if (
       code === 'CERT_HAS_EXPIRED' ||
       code === 'DEPTH_ZERO_SELF_SIGNED_CERT' ||
@@ -665,6 +903,15 @@ export async function activate(context: vscode.ExtensionContext) {
         await mgr.activate(macroName);
         vscode.window.showInformationMessage(`Activated macro ${macroName}`);
         await treeProvider?.fetchMacros();
+        const autoRestart = vscode.workspace.getConfiguration('codec').get<boolean>('autoRestartOnActivateDeactivate', false);
+        if (autoRestart) {
+          try {
+            await mgr.restartFramework();
+            vscode.window.showInformationMessage('Macro framework restarted');
+          } catch (e: any) {
+            vscode.window.showWarningMessage('Macro activated, but failed to restart framework: ' + (e?.message || String(e)));
+          }
+        }
       } catch (err: any) {
         vscode.window.showErrorMessage('Failed to activate macro: ' + (err.message || String(err)));
       }
@@ -681,6 +928,15 @@ export async function activate(context: vscode.ExtensionContext) {
         await mgr.deactivate(macroName);
         vscode.window.showInformationMessage(`Deactivated macro ${macroName}`);
         await treeProvider?.fetchMacros();
+        const autoRestart = vscode.workspace.getConfiguration('codec').get<boolean>('autoRestartOnActivateDeactivate', false);
+        if (autoRestart) {
+          try {
+            await mgr.restartFramework();
+            vscode.window.showInformationMessage('Macro framework restarted');
+          } catch (e: any) {
+            vscode.window.showWarningMessage('Macro deactivated, but failed to restart framework: ' + (e?.message || String(e)));
+          }
+        }
       } catch (err: any) {
         vscode.window.showErrorMessage('Failed to deactivate macro: ' + (err.message || String(err)));
       }

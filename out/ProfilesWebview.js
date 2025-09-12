@@ -37,6 +37,9 @@ class ProfilesWebview {
                 else if (msg.type === 'setAutoRestart') {
                     await vscode.workspace.getConfiguration('codec').update('autoRestartOnSave', !!msg.value, vscode.ConfigurationTarget.Global);
                 }
+                else if (msg.type === 'setAutoRestartOnActivateDeactivate') {
+                    await vscode.workspace.getConfiguration('codec').update('autoRestartOnActivateDeactivate', !!msg.value, vscode.ConfigurationTarget.Global);
+                }
                 else if (msg.type === 'refreshSchema') {
                     await vscode.commands.executeCommand('ciscoCodec.refreshSchema');
                 }
@@ -51,6 +54,9 @@ class ProfilesWebview {
                 }
                 else if (msg.type === 'setForcedProduct') {
                     await vscode.commands.executeCommand('ciscoCodec.setForcedProduct', String(msg.value || 'auto'));
+                }
+                else if (msg.type === 'setApplySchema') {
+                    await vscode.workspace.getConfiguration('codec').update('applySchemaToIntellisense', !!msg.value, vscode.ConfigurationTarget.Global);
                 }
                 await this.postState();
             }
@@ -67,13 +73,15 @@ class ProfilesWebview {
         const profiles = await this.store.listProfiles();
         const activeId = await this.store.getActiveProfileId();
         const autoRestart = vscode.workspace.getConfiguration('codec').get('autoRestartOnSave', false);
+        const autoRestartOnActivateDeactivate = vscode.workspace.getConfiguration('codec').get('autoRestartOnActivateDeactivate', false);
+        const applySchema = vscode.workspace.getConfiguration('codec').get('applySchemaToIntellisense', true);
         const confirmMacroDelete = vscode.workspace.getConfiguration('codec').get('confirmMacroDelete', true);
         const confirmFrameworkRestart = vscode.workspace.getConfiguration('codec').get('confirmFrameworkRestart', true);
         const forcedProduct = vscode.workspace.getConfiguration('codec').get('forcedProduct', 'auto');
         // Query schema status via command invocation – use commands to avoid tight coupling.
         const status = await vscode.commands.executeCommand('ciscoCodec.getSchemaStatus');
         const knownProducts = await vscode.commands.executeCommand('ciscoCodec.getKnownProducts');
-        this.panel.webview.postMessage({ type: 'state', profiles, activeId, autoRestart, schemaStatus: status, confirmMacroDelete, confirmFrameworkRestart, forcedProduct, knownProducts });
+        this.panel.webview.postMessage({ type: 'state', profiles, activeId, autoRestart, autoRestartOnActivateDeactivate, applySchema, schemaStatus: status, confirmMacroDelete, confirmFrameworkRestart, forcedProduct, knownProducts });
     }
     renderHtml() {
         return `<!DOCTYPE html>
@@ -113,6 +121,8 @@ class ProfilesWebview {
 
     let state = { profiles: [], activeId: '' };
     let autoRestart = false;
+    let autoRestartOnActivateDeactivate = false;
+    let applySchema = true;
     let schemaStatus = { loaded: false, rootKeys: 0, cachedNodes: 0, lastUpdatedMs: null, error: null, activeProduct: null };
     let confirmMacroDelete = true;
     let confirmFrameworkRestart = true;
@@ -125,6 +135,8 @@ class ProfilesWebview {
       if (msg.type === 'state') {
         state = { profiles: msg.profiles, activeId: msg.activeId };
         autoRestart = !!msg.autoRestart;
+        autoRestartOnActivateDeactivate = !!msg.autoRestartOnActivateDeactivate;
+        applySchema = !!msg.applySchema;
         schemaStatus = msg.schemaStatus || schemaStatus;
         confirmMacroDelete = !!msg.confirmMacroDelete;
         confirmFrameworkRestart = !!msg.confirmFrameworkRestart;
@@ -143,6 +155,14 @@ class ProfilesWebview {
       const chk = document.getElementById('autoRestart');
       if (chk) chk.addEventListener('change', (e) => {
         vscode.postMessage({ type: 'setAutoRestart', value: e.target.checked });
+      });
+      const chk2 = document.getElementById('autoRestartOnActivateDeactivate');
+      if (chk2) chk2.addEventListener('change', (e) => {
+        vscode.postMessage({ type: 'setAutoRestartOnActivateDeactivate', value: e.target.checked });
+      });
+      const applySchemaChk = document.getElementById('applySchema');
+      if (applySchemaChk) applySchemaChk.addEventListener('change', (e) => {
+        vscode.postMessage({ type: 'setApplySchema', value: e.target.checked });
       });
       const delChk = document.getElementById('confirmMacroDelete');
       if (delChk) delChk.addEventListener('change', (e) => {
@@ -206,6 +226,10 @@ class ProfilesWebview {
       tbody.innerHTML = '';
       const chk = document.getElementById('autoRestart');
       if (chk) chk.checked = !!autoRestart;
+      const chk2 = document.getElementById('autoRestartOnActivateDeactivate');
+      if (chk2) chk2.checked = !!autoRestartOnActivateDeactivate;
+      const applySchemaChk = document.getElementById('applySchema');
+      if (applySchemaChk) applySchemaChk.checked = !!applySchema;
       const delChk = document.getElementById('confirmMacroDelete');
       if (delChk) delChk.checked = !!confirmMacroDelete;
       const fwChk = document.getElementById('confirmFrameworkRestart');
@@ -308,12 +332,21 @@ class ProfilesWebview {
     </label>
     <br/>
     <label style="display:flex;align-items:center;gap:6px;white-space:nowrap;">
+      <input id="autoRestartOnActivateDeactivate" type="checkbox" /> Automatically restart macro framework when activating or deactivating a macro
+    </label>
+    <br/>
+    <label style="display:flex;align-items:center;gap:6px;white-space:nowrap;">
       <input id="confirmMacroDelete" type="checkbox" /> Confirm before deleting a macro
     </label>
     <br/>
     <label style="display:flex;align-items:center;gap:6px;white-space:nowrap;">
       <input id="confirmFrameworkRestart" type="checkbox" /> Confirm before restarting Macro Framework
+      </label>
+    <br/>
+    <label style="display:flex;align-items:center;gap:6px;white-space:nowrap;">
+      <input id="applySchema" type="checkbox" /> Apply xAPI schema to IntelliSense (completions and hovers)
     </label>
+    <br/>
   </div>
   <div class="section">
     <h2>Schema</h2>

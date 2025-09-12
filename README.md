@@ -10,7 +10,8 @@ Edit and manage Cisco RoomOS codec macros directly from VS Code. Browse, open, e
 - Restart macro framework from the context menu
 - Multi‑codec profiles directory (secure credentials storage) with a management UI
 - Seamless profile switching without reloading
-- xAPI schema‑aware IntelliSense (completion and hover)
+- xAPI schema‑aware IntelliSense (completion, optional hover)
+- xAPI help panel and stub insertion (experimental)
 - Product filter for schema: Auto‑detect or force a specific device
 - Settings toggles for confirmation prompts (macro delete, framework restart)
 - Schema management: Refresh and View JSON
@@ -18,7 +19,7 @@ Edit and manage Cisco RoomOS codec macros directly from VS Code. Browse, open, e
 ### Requirements
 
 - Node.js 18+ / npm
-- VS Code 1.70+
+- VS Code 1.75+
 - Network access to the Cisco codec (Room/Board/Desk series)
 - Admin credentials on the target codec
 
@@ -41,6 +42,30 @@ Edit and manage Cisco RoomOS codec macros directly from VS Code. Browse, open, e
 3. After connecting, your macros appear in the tree
 4. Click a macro to open it. Edit as desired and press Ctrl+S to save
    - On save you’ll see “Saved macro <name>” and the “unsaved” badge clears
+
+### xAPI IntelliSense, Help, and Stubs (Experimental)
+
+These features use the public RoomOS xAPI schema to enhance editing. Behavior may change while we iterate. Schema source: `https://roomos.cisco.com/api/schema/latest`.
+
+- Completion
+  - Suggestions auto‑popup as you type after `xapi.` and segments like `Command`, `Status`, etc.
+  - Rich schema details (description, params) show when you explicitly invoke completion (press Ctrl+Space). While typing, the list stays quiet (no big docs pane).
+  - Works in `codecfs:` JavaScript/TypeScript files.
+
+- Help panel
+  - Right‑click on an xAPI path (e.g., `xapi.Command.Audio.Diagnostics.Advanced.Run`) → “xAPI: Show Help for Symbol”.
+  - Opens a themed panel with the node kind, access, roles, description, and a parameter table.
+
+- Insert stubs
+  - Right‑click → “xAPI: Insert Stub”, or run it from the Command Palette.
+  - Inserts a sensible snippet based on the node type:
+    - Command: `xapi.Command.<Path>({ Param: Default, ... });`
+    - Config: `xapi.Config.<Path> = …;`
+    - Status: `const value = await xapi.Status.<Path>.get();`
+    - Event: `xapi.Event.<Path>.on((event) => { … });`
+  - The current xAPI token is replaced in‑place.
+
+Note: These features are experimental. If completion doesn’t appear, ensure the file uses the `codecfs:` scheme and “Apply xAPI schema to IntelliSense” is enabled in Settings.
 
 ### Screenshots
 
@@ -82,10 +107,13 @@ When a `codecfs:` document has unsaved changes, its item in the tree shows the d
 
 ### Settings & preferences
 
-- Automatically restart macro framework when saving a macro
+- Automatically restart macro framework when saving a macro (default: on)
+- Automatically restart macro framework when activating/deactivating a macro (default: on)
 - Schema product selection:
   - Auto: use device detection
   - Choose a specific product to filter schema/IntelliSense
+- Apply xAPI schema to IntelliSense (default: on)
+- Show schema help on hover while typing (default: off)
 - Confirmation prompts:
   - Confirm before deleting a macro
   - Confirm before restarting the Macro Framework

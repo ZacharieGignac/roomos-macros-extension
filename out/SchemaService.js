@@ -118,12 +118,22 @@ class SchemaService {
         if (!node)
             return null;
         const out = {};
-        for (const key of Object.keys(node.children)) {
+        const keys = Object.keys(node.children);
+        let included = 0;
+        for (const key of keys) {
             const child = node.children[key];
             if (this.activeProductInternal && !this.subtreeSupportsProduct(child, this.activeProductInternal)) {
                 continue; // filter out nodes not supported by active product
             }
             out[key] = child.meta ?? { children: Object.keys(child.children) };
+            included++;
+        }
+        // If filtering by product excluded everything (e.g., unknown product code), fall back to unfiltered children
+        if (this.activeProductInternal && included === 0) {
+            for (const key of keys) {
+                const child = node.children[key];
+                out[key] = child.meta ?? { children: Object.keys(child.children) };
+            }
         }
         return out;
     }
