@@ -45,11 +45,11 @@ Edit and manage Cisco RoomOS codec macros directly from VS Code. Browse, open, e
 
 ### xAPI IntelliSense, Help, and Stubs (Experimental)
 
-These features use the public RoomOS xAPI schema to enhance editing. Behavior may change while we iterate. Schema source: `https://roomos.cisco.com/api/schema/latest`.
+These features use the public RoomOS xAPI schema to enhance editing. Behavior may change.
 
 - Completion
   - Suggestions auto‑popup as you type after `xapi.` and segments like `Command`, `Status`, etc.
-  - Rich schema details (description, params) show when you explicitly invoke completion (press Ctrl+Space). While typing, the list stays quiet (no big docs pane).
+  - Rich schema details (description, params) show when you explicitly invoke completion (press Ctrl+Space).
   - Works in `codecfs:` JavaScript/TypeScript files.
 
 - Help panel
@@ -63,7 +63,6 @@ These features use the public RoomOS xAPI schema to enhance editing. Behavior ma
     - Config: `xapi.Config.<Path> = …;`
     - Status: `const value = await xapi.Status.<Path>.get();`
     - Event: `xapi.Event.<Path>.on((event) => { … });`
-  - The current xAPI token is replaced in‑place.
 
 Note: These features are experimental. If completion doesn’t appear, ensure the file uses the `codecfs:` scheme and “Apply xAPI schema to IntelliSense” is enabled in Settings.
 
