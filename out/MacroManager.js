@@ -12,6 +12,7 @@ class MacroManager {
         this.reconnectTimer = null;
         this.explicitDisconnect = false;
         this.stateListeners = [];
+        this.macroLogListeners = [];
     }
     async connect() {
         this.explicitDisconnect = false;
@@ -106,6 +107,15 @@ class MacroManager {
             catch { }
         }
     }
+    // Public subscription for macro log events
+    onMacroLog(listener) {
+        this.macroLogListeners.push(listener);
+        return () => {
+            const idx = this.macroLogListeners.indexOf(listener);
+            if (idx >= 0)
+                this.macroLogListeners.splice(idx, 1);
+        };
+    }
     attachXapi(x) {
         // Ensure previous timers are cleared
         if (this.reconnectTimer) {
@@ -130,6 +140,18 @@ class MacroManager {
             }
             this.scheduleReconnect();
         });
+        // Forward macro log events to registered listeners
+        try {
+            x.Event.Macros.Log.on((value) => {
+                for (const fn of this.macroLogListeners) {
+                    try {
+                        fn(value);
+                    }
+                    catch { }
+                }
+            });
+        }
+        catch { }
     }
     scheduleReconnect() {
         this.reconnectAttempts += 1;

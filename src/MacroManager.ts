@@ -9,6 +9,7 @@ export class MacroManager {
   private reconnectTimer: NodeJS.Timeout | null = null;
   private explicitDisconnect = false;
   private stateListeners: Array<(s: ConnectionState) => void> = [];
+  private macroLogListeners: Array<(log: any) => void> = [];
 
   constructor(
     private host: string,
@@ -129,6 +130,15 @@ export class MacroManager {
     }
   }
 
+  // Public subscription for macro log events
+  onMacroLog(listener: (log: any) => void): () => void {
+    this.macroLogListeners.push(listener);
+    return () => {
+      const idx = this.macroLogListeners.indexOf(listener);
+      if (idx >= 0) this.macroLogListeners.splice(idx, 1);
+    };
+  }
+
   private attachXapi(x: XAPI) {
     // Ensure previous timers are cleared
     if (this.reconnectTimer) {
@@ -153,6 +163,15 @@ export class MacroManager {
       }
       this.scheduleReconnect();
     });
+
+    // Forward macro log events to registered listeners
+    try {
+      (x as any).Event.Macros.Log.on((value: any) => {
+        for (const fn of this.macroLogListeners) {
+          try { fn(value); } catch {}
+        }
+      });
+    } catch {}
   }
 
   private scheduleReconnect() {
@@ -174,3 +193,4 @@ export class MacroManager {
     }, delay);
   }
 }
+ 

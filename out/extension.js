@@ -20,12 +20,15 @@ async function activate(context) {
     let treeProvider = null;
     let unbindManagerState = null;
     let xapiHelpPanel = null;
+    let unbindMacroLogs = null;
     const statusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
     statusBar.name = 'RoomOS Macros';
     statusBar.command = 'ciscoCodec.manageProfiles';
     statusBar.text = '$(debug-disconnect) RoomOS: Disconnected';
     statusBar.tooltip = 'Manage codec profiles';
     statusBar.show();
+    const macroOutput = vscode.window.createOutputChannel('RoomOS Macro Logs');
+    context.subscriptions.push(macroOutput);
     function setConnectedContext(connected) {
         vscode.commands.executeCommand('setContext', 'codec.connected', connected);
     }
@@ -70,6 +73,35 @@ async function activate(context) {
         unbindManagerState = () => {
             off();
             unbindManagerState = null;
+        };
+    }
+    function bindMacroLogs(manager, host) {
+        if (unbindMacroLogs)
+            unbindMacroLogs();
+        const formatLog = (val) => {
+            try {
+                if (val && typeof val === 'object' && (val.Message || val.Level || val.Macro)) {
+                    const tsRaw = typeof val.Timestamp === 'string' ? val.Timestamp : undefined;
+                    const time = tsRaw ? tsRaw.slice(11, 23) : new Date().toISOString().slice(11, 23);
+                    const level = String(val.Level || '').toUpperCase();
+                    const macro = String(val.Macro || '');
+                    const message = String(val.Message || '').trim();
+                    const badge = level.includes('ERR') ? '🔴' : level.includes('WARN') ? '🟡' : '🟢';
+                    const macStr = macro ? `[${macro}]` : '';
+                    const parts = macStr ? [time, badge, macStr] : [time, badge];
+                    return `${parts.join(' ')} - ${message}`;
+                }
+            }
+            catch { }
+            return `${typeof val === 'string' ? val : JSON.stringify(val, null, 2)}`;
+        };
+        const off = manager.onMacroLog((value) => {
+            const line = formatLog(value);
+            macroOutput.appendLine(line);
+        });
+        unbindMacroLogs = () => {
+            off();
+            unbindMacroLogs = null;
         };
     }
     const getManagerOrWarn = () => {
@@ -454,6 +486,7 @@ async function activate(context) {
         if (connectedManager) {
             currentManager = connectedManager;
             vscode.window.showInformationMessage(`Connected to codec at ${active.host}`);
+            bindMacroLogs(currentManager, active.host);
         }
         // Register filesystem
         provider = new CodecFilesystem_1.CodecFileSystem(currentManager);
@@ -674,6 +707,7 @@ async function activate(context) {
             currentManager = effectiveManager;
             currentProfileId = selected.id;
             bindManagerState(effectiveManager, selected.host);
+            bindMacroLogs(effectiveManager, selected.host);
             // Re-register provider to ensure fresh handle after reconnect
             try {
                 if (provider) {
