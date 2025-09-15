@@ -15,6 +15,7 @@ Edit and manage Cisco RoomOS codec macros directly from VS Code. Browse, open, e
 - Product filter for schema: Auto‑detect or force a specific device
 - Settings toggles for confirmation prompts (macro delete, framework restart)
 - Schema management: Refresh and View JSON
+- Live macro logs in the Output panel (color‑coded severity)
 
 ### Requirements
 
@@ -42,6 +43,12 @@ Edit and manage Cisco RoomOS codec macros directly from VS Code. Browse, open, e
 3. After connecting, your macros appear in the tree
 4. Click a macro to open it. Edit as desired and press Ctrl+S to save
    - On save you’ll see “Saved macro <name>” and the “unsaved” badge clears
+
+### Macro logs (Output)
+
+- Open View → Output, then choose “RoomOS Macro Logs” from the dropdown.
+- Logs stream automatically when connected and rebind on profile switch.
+
 
 ### xAPI IntelliSense, Help, and Stubs (Experimental)
 
