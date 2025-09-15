@@ -54,7 +54,7 @@ These features use the public RoomOS xAPI schema to enhance editing. Behavior ma
 
 - Help panel
   - Right‑click on an xAPI path (e.g., `xapi.Command.Audio.Diagnostics.Advanced.Run`) → “xAPI: Show Help for Symbol”.
-  - Opens a themed panel with the node kind, access, roles, description, and a parameter table.
+  - Opens a panel with the node kind, access, roles, description, and a parameter table.
 
 - Insert stubs
   - Right‑click → “xAPI: Insert Stub”, or run it from the Command Palette.
@@ -126,28 +126,17 @@ When a `codecfs:` document has unsaved changes, its item in the tree shows the d
   - Verify IP/hostname, credentials, and that the codec allows WebSocket connections over `wss:`
 
 
-### Development status and disclaimer
-
-This project is under active development and provided “as is”, without warranty of any kind. The author assumes no responsibility for any outcomes arising from the use of this software, including but not limited to:
-
-- Loss of data
-- Loss of hair
-- Loss of enjoyment
-- Fire in the engine room
-
-Use at your own risk. Test changes in non‑production environments first.
-
 ### Development scripts
 
 - Install deps: `npm install`
 - Build once: `npm run build`
-- Watch build: `npm run watch`
-- Package VSIX: `npx vsce package`
+- Package VSIX: `npm run pak`
+- Output: `dist/RoomOS-Macro-Editor-<version>.vsix`
 
-After building or packaging, reload the VS Code window or install the generated `.vsix` (e.g., `roomos-macros-extension-*.vsix`) via the Extensions view three‑dot menu → “Install from VSIX…”.
+After building or packaging, install the generated `.vsix` (e.g., `dist/RoomOS-Macro-Editor-*.vsix`) via the Extensions view three‑dot menu → “Install from VSIX…`.
 
 ### License
 
-MIT (see LICENSE if present). Cisco, RoomOS, and related marks are property of their respective owners.
+MIT. Cisco, RoomOS, and related marks are property of their respective owners.
 
 

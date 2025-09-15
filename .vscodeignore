@@ -1,23 +1,18 @@
-# Exclude sources and build artifacts not needed at runtime
-.vscode/**
-.vscode-test/**
-.github/**
-.git/**
+# Exclude development and source files from the packaged VSIX
+**/.git/**
+**/.github/**
+**/.vscode/**
+**/.DS_Store
 
-# TypeScript sources and maps
+# Exclude test scaffolding
+.vscode-test/**
+
+# Exclude TypeScript sources; ship compiled JS from out/
 src/**
 **/*.ts
-**/*.map
-tsconfig.json
 
-# Tests and tooling
-out/test/**
-test/**
-**/jest.config.*
-.eslintrc*
-.prettierrc*
-.editorconfig
+# Exclude source maps to shrink the package
+out/**/*.map
 
-# Misc
-*.log
-**/.DS_Store
+# Exclude local VSIX artifacts
+RoomOS-Macro-Editor-*.vsix
