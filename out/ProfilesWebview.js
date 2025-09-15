@@ -398,25 +398,6 @@ class ProfilesWebview {
     </thead>
     <tbody id="tbody"></tbody>
   </table>
-  <div class="section" style="margin-top:16px;">
-    <h2>Disclaimer</h2>
-    <div class="schemaBox">
-      <div class="schemaRow" style="justify-content: flex-start;">
-        <div class="schemaMeta" style="max-width: 900px;">
-          This project is under active development and provided “as is”, without warranty of any kind. The author assumes no responsibility for any outcomes arising from the use of this software. Use at your own risk and test changes in non‑production environments first.
-          <div style="margin-top:8px;">
-            Potential consequences include (but are not limited to):
-            <ul style="margin:6px 0 0 18px;">
-              <li>Loss of data</li>
-              <li>Loss of hair</li>
-              <li>Loss of enjoyment</li>
-              <li>Fire in the engine room</li>
-            </ul>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
 </body>
 </html>`;
     }
