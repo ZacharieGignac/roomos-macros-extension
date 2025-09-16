@@ -11,6 +11,11 @@ const ProfilesWebview_1 = require("./ProfilesWebview");
 const XapiLanguage_1 = require("./XapiLanguage");
 const SchemaService_1 = require("./SchemaService");
 const products_1 = require("./products");
+const StatusBarService_1 = require("./extension/StatusBarService");
+const MacroLogService_1 = require("./extension/MacroLogService");
+const DirtyMacroTracker_1 = require("./extension/DirtyMacroTracker");
+const ProductDetectionService_1 = require("./extension/ProductDetectionService");
+const SchemaPathResolver_1 = require("./extension/SchemaPathResolver");
 async function activate(context) {
     const profiles = new ProfileStore_1.ProfileStore(context);
     const config = vscode.workspace.getConfiguration('codec');
@@ -19,92 +24,11 @@ async function activate(context) {
     let currentProfileId = null;
     let provider = null;
     let treeProvider = null;
-    let unbindManagerState = null;
     let xapiHelpPanel = null;
-    let unbindMacroLogs = null;
-    const statusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
-    statusBar.name = 'RoomOS Macros';
-    statusBar.command = 'ciscoCodec.manageProfiles';
-    statusBar.text = '$(debug-disconnect) RoomOS: Disconnected';
-    statusBar.tooltip = 'Manage codec profiles';
-    statusBar.show();
-    const macroOutput = vscode.window.createOutputChannel('RoomOS Macro Logs');
-    context.subscriptions.push(macroOutput);
-    function setConnectedContext(connected) {
-        vscode.commands.executeCommand('setContext', 'codec.connected', connected);
-    }
-    function bindManagerState(manager, host) {
-        if (unbindManagerState)
-            unbindManagerState();
-        const update = () => {
-            const s = manager.getState();
-            if (s === 'ready') {
-                statusBar.text = '$(check) RoomOS: Connected';
-                statusBar.tooltip = `Connected to ${host}`;
-                setConnectedContext(true);
-            }
-            else if (s === 'connecting') {
-                statusBar.text = '$(sync~spin) RoomOS: Connecting…';
-                statusBar.tooltip = `Connecting to ${host}`;
-                setConnectedContext(false);
-            }
-            else if (s === 'reconnecting') {
-                statusBar.text = '$(sync~spin) RoomOS: Reconnecting…';
-                statusBar.tooltip = `Reconnecting to ${host}`;
-                setConnectedContext(false);
-            }
-            else if (s === 'disconnected') {
-                statusBar.text = '$(debug-disconnect) RoomOS: Disconnected';
-                statusBar.tooltip = 'Manage codec profiles';
-                setConnectedContext(false);
-            }
-            else if (s === 'error') {
-                statusBar.text = '$(error) RoomOS: Error';
-                statusBar.tooltip = `Connection error for ${host}`;
-                setConnectedContext(false);
-            }
-            else {
-                statusBar.text = '$(gear) RoomOS';
-                statusBar.tooltip = 'RoomOS Macros';
-                setConnectedContext(false);
-            }
-        };
-        update();
-        const off = manager.onStateChange(() => update());
-        unbindManagerState = () => {
-            off();
-            unbindManagerState = null;
-        };
-    }
-    function bindMacroLogs(manager, host) {
-        if (unbindMacroLogs)
-            unbindMacroLogs();
-        const formatLog = (val) => {
-            try {
-                if (val && typeof val === 'object' && (val.Message || val.Level || val.Macro)) {
-                    const tsRaw = typeof val.Timestamp === 'string' ? val.Timestamp : undefined;
-                    const time = tsRaw ? tsRaw.slice(11, 23) : new Date().toISOString().slice(11, 23);
-                    const level = String(val.Level || '').toUpperCase();
-                    const macro = String(val.Macro || '');
-                    const message = String(val.Message || '').trim();
-                    const badge = level.includes('ERR') ? '🔴' : level.includes('WARN') ? '🟡' : '🟢';
-                    const macStr = macro ? `[${macro}]` : '';
-                    const parts = macStr ? [time, badge, macStr] : [time, badge];
-                    return `${parts.join(' ')} - ${message}`;
-                }
-            }
-            catch { }
-            return `${typeof val === 'string' ? val : JSON.stringify(val, null, 2)}`;
-        };
-        const off = manager.onMacroLog((value) => {
-            const line = formatLog(value);
-            macroOutput.appendLine(line);
-        });
-        unbindMacroLogs = () => {
-            off();
-            unbindMacroLogs = null;
-        };
-    }
+    const statusBarService = new StatusBarService_1.StatusBarService();
+    const macroLogService = new MacroLogService_1.MacroLogService();
+    let dirtyTracker = null;
+    context.subscriptions.push({ dispose: () => statusBarService.dispose() }, { dispose: () => macroLogService.dispose() });
     const getManagerOrWarn = () => {
         if (!currentManager) {
             vscode.window.showWarningMessage('No active codec connection. Add and activate a profile in Settings.');
@@ -132,27 +56,12 @@ async function activate(context) {
             vscode.window.showInformationMessage('Place the cursor on an xapi path like xapi.Command.Audio.');
             return;
         }
-        let basePath = ctx.category;
         const schema = new SchemaService_1.SchemaService(context);
-        for (const seg of ctx.completedSegments) {
-            const children = await schema.getChildrenMap(basePath);
-            if (!children)
-                break;
-            const keys = Object.keys(children);
-            const match = keys.find(k => k.toLowerCase() === String(seg).toLowerCase());
-            basePath = match ? `${basePath}.${match}` : `${basePath}.${seg}`;
-        }
-        // Include current token if it uniquely matches
-        if (ctx.currentPartial) {
-            const children = await schema.getChildrenMap(basePath);
-            if (children) {
-                const keys = Object.keys(children);
-                const exact = keys.find(k => k.toLowerCase() === String(ctx.currentPartial).toLowerCase());
-                const matches = keys.filter(k => k.toLowerCase().startsWith(String(ctx.currentPartial).toLowerCase()));
-                const chosen = exact || (matches.length === 1 ? matches[0] : undefined);
-                if (chosen)
-                    basePath = `${basePath}.${chosen}`;
-            }
+        const resolver = new SchemaPathResolver_1.SchemaPathResolver(schema);
+        const basePath = await resolver.resolveIncludingUniquePartial(ctx);
+        if (!basePath) {
+            vscode.window.showWarningMessage('No schema context found for stub.');
+            return;
         }
         const node = await schema.getNodeSchema(basePath);
         if (!node) {
@@ -204,32 +113,12 @@ async function activate(context) {
             vscode.window.showInformationMessage('Place the cursor on an xapi path like xapi.Command.Audio.');
             return;
         }
-        let basePath = ctx.category;
         const schema = new SchemaService_1.SchemaService(context);
-        for (const seg of ctx.completedSegments) {
-            const children = await schema.getChildrenMap(basePath);
-            if (!children)
-                break;
-            const keys = Object.keys(children);
-            const match = keys.find(k => k.toLowerCase() === String(seg).toLowerCase());
-            basePath = match ? `${basePath}.${match}` : `${basePath}.${seg}`;
-        }
-        // Try to include the current token if it exactly matches a child, or uniquely matches as a prefix
-        if (ctx.currentPartial) {
-            const children = await schema.getChildrenMap(basePath);
-            if (children) {
-                const keys = Object.keys(children);
-                const exact = keys.find(k => k.toLowerCase() === String(ctx.currentPartial).toLowerCase());
-                if (exact) {
-                    basePath = `${basePath}.${exact}`;
-                }
-                else {
-                    const matches = keys.filter(k => k.toLowerCase().startsWith(String(ctx.currentPartial).toLowerCase()));
-                    if (matches.length === 1) {
-                        basePath = `${basePath}.${matches[0]}`;
-                    }
-                }
-            }
+        const resolver = new SchemaPathResolver_1.SchemaPathResolver(schema);
+        const basePath = await resolver.resolveIncludingUniquePartial(ctx);
+        if (!basePath) {
+            vscode.window.showInformationMessage('No schema information found for current symbol.');
+            return;
         }
         const node = await schema.getNodeSchema(basePath);
         if (!node) {
@@ -365,6 +254,7 @@ async function activate(context) {
     }));
     // Initialize schema service EARLY so Settings webview can query status/known products
     const schemaService = new SchemaService_1.SchemaService(context);
+    const productDetector = new ProductDetectionService_1.ProductDetectionService(schemaService);
     context.subscriptions.push(vscode.commands.registerCommand('ciscoCodec.refreshSchema', async () => {
         await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: 'Refreshing xAPI schema…' }, async () => {
             await schemaService.refresh();
@@ -382,7 +272,7 @@ async function activate(context) {
         const value = (code && typeof code === 'string') ? code : 'auto';
         await cfg.update('forcedProduct', value, vscode.ConfigurationTarget.Global);
         if (value === 'auto') {
-            await setActiveProductFromCodec();
+            await productDetector.setActiveProductFromCodec(currentManager);
         }
         else {
             schemaService.setActiveProductInternal(value);
@@ -438,12 +328,13 @@ async function activate(context) {
         const manager = new MacroManager_1.MacroManager(active.host, active.username, pass);
         currentManager = manager;
         currentProfileId = active.id;
-        bindManagerState(manager, active.host);
+        statusBarService.bind(manager, active.host);
         const connectedManager = await connectWithHandling(manager, active);
         if (connectedManager) {
             currentManager = connectedManager;
             vscode.window.showInformationMessage(`Connected to codec at ${active.host}`);
-            bindMacroLogs(currentManager, active.host);
+            statusBarService.bind(currentManager, active.host);
+            macroLogService.bind(currentManager);
         }
         // Register filesystem
         provider = new CodecFilesystem_1.CodecFileSystem(currentManager);
@@ -453,35 +344,12 @@ async function activate(context) {
         // Register explorer view
         treeProvider = new MacroTreeProvider_1.MacroTreeProvider(currentManager);
         vscode.window.registerTreeDataProvider('codecMacrosExplorer', treeProvider);
-    }
-    // Track dirty macros (unsaved editor changes)
-    const dirty = new Set();
-    function updateDirtyState() {
-        dirty.clear();
-        for (const doc of vscode.workspace.textDocuments) {
-            if (doc.uri.scheme === 'codecfs' && doc.isDirty) {
-                const name = doc.uri.path.replace(/^\//, '').replace(/\.js$/, '');
-                dirty.add(name);
-            }
-        }
-        if (treeProvider) {
-            treeProvider.setDirtySet(dirty);
+        if (!dirtyTracker) {
+            dirtyTracker = new DirtyMacroTracker_1.DirtyMacroTracker(treeProvider);
+            dirtyTracker.attach(context);
         }
     }
-    context.subscriptions.push(vscode.workspace.onDidChangeTextDocument(e => {
-        if (e.document.uri.scheme === 'codecfs')
-            updateDirtyState();
-    }), vscode.workspace.onDidSaveTextDocument(doc => {
-        if (doc.uri.scheme === 'codecfs')
-            updateDirtyState();
-    }), vscode.workspace.onDidOpenTextDocument(doc => {
-        if (doc.uri.scheme === 'codecfs')
-            updateDirtyState();
-    }), vscode.workspace.onDidCloseTextDocument(doc => {
-        if (doc.uri.scheme === 'codecfs')
-            updateDirtyState();
-    }));
-    updateDirtyState();
+    // Dirty macro tracking handled by DirtyMacroTracker once tree provider is created
     // Preload xAPI schema with a progress message, then register language features
     await vscode.window.withProgress({ location: vscode.ProgressLocation.Window, title: 'Getting xAPI schema…' }, async () => {
         await schemaService.preload();
@@ -494,50 +362,7 @@ async function activate(context) {
             schemaService.setActiveProductInternal(fp);
         }
         else {
-            await setActiveProductFromCodec();
-        }
-    }
-    async function setActiveProductFromCodec() {
-        try {
-            // Prefer live connected manager
-            const mgr = currentManager;
-            if (!mgr || !mgr.xapi)
-                return;
-            // Try ProductPlatform first; fall back to ProductId mapping
-            let code = null;
-            let platformRaw = null;
-            let productIdRaw = null;
-            try {
-                const platform = await mgr.xapi.Status.SystemUnit.ProductPlatform.get();
-                if (typeof platform === 'string' && platform.trim().length > 0) {
-                    platformRaw = platform.trim();
-                    const platLower = platformRaw.toLowerCase().replace(/\s+/g, '_');
-                    // If platform equals a known internal code, use it; otherwise try mapping as a label
-                    if ((0, products_1.isKnownInternalCode)(platLower)) {
-                        code = platLower;
-                    }
-                    else {
-                        code = (0, products_1.resolveInternalProductCode)(platformRaw);
-                    }
-                }
-            }
-            catch { }
-            if (!code) {
-                const productId = await mgr.xapi.Status.SystemUnit.ProductId.get();
-                if (typeof productId === 'string' && productId.trim().length > 0) {
-                    productIdRaw = productId.trim();
-                    code = (0, products_1.resolveInternalProductCode)(productIdRaw);
-                }
-            }
-            schemaService.setActiveProductInternal(code);
-            // Provide raw identifiers to status for debugging
-            try {
-                schemaService.setDeviceIdentifiers?.(platformRaw, productIdRaw);
-            }
-            catch { }
-        }
-        catch (e) {
-            // Non-fatal; leave product unset
+            await productDetector.setActiveProductFromCodec(currentManager);
         }
     }
     async function ensureNoUnsavedCodecDocs() {
@@ -599,8 +424,8 @@ async function activate(context) {
             const effectiveManager = connected;
             currentManager = effectiveManager;
             currentProfileId = selected.id;
-            bindManagerState(effectiveManager, selected.host);
-            bindMacroLogs(effectiveManager, selected.host);
+            statusBarService.bind(effectiveManager, selected.host);
+            macroLogService.bind(effectiveManager);
             // Re-register provider to ensure fresh handle after reconnect
             try {
                 if (provider) {
@@ -626,7 +451,7 @@ async function activate(context) {
                 schemaService.setActiveProductInternal(forcedNow);
             }
             else {
-                await setActiveProductFromCodec();
+                await productDetector.setActiveProductFromCodec(currentManager);
             }
         }
         catch (err) {
