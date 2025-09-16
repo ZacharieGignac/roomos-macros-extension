@@ -1,5 +1,8 @@
 import * as vscode from 'vscode';
 import { ProfileStore } from './ProfileStore';
+import { CodecConfig } from './extension/CodecConfig';
+import { getMediaUri, getNonce } from './extension/webviewUtils';
+import { ProfilesOutMsg } from './webview/ProfilesProtocol';
 
 export class ProfilesWebview {
   private panel: vscode.WebviewPanel | null = null;
@@ -20,8 +23,9 @@ export class ProfilesWebview {
     );
 
     this.panel.onDidDispose(() => (this.panel = null));
-    this.panel.webview.onDidReceiveMessage(async (msg) => {
+    this.panel.webview.onDidReceiveMessage(async (msg: ProfilesOutMsg) => {
       try {
+        const cfg = new CodecConfig();
         if (msg.type === 'add') {
           await this.store.addProfile(msg.label, msg.host, msg.username, msg.password);
         } else if (msg.type === 'setActive') {
@@ -34,21 +38,21 @@ export class ProfilesWebview {
           await this.store.updateProfile(msg.originalId, msg.updates, msg.password);
           await vscode.commands.executeCommand('ciscoCodec.reloadForActiveProfile');
         } else if (msg.type === 'setAutoRestart') {
-          await vscode.workspace.getConfiguration('codec').update('autoRestartOnSave', !!msg.value, vscode.ConfigurationTarget.Global);
+          await cfg.setAutoRestartOnSave(!!msg.value);
         } else if (msg.type === 'setAutoRestartOnActivateDeactivate') {
-          await vscode.workspace.getConfiguration('codec').update('autoRestartOnActivateDeactivate', !!msg.value, vscode.ConfigurationTarget.Global);
+          await cfg.setAutoRestartOnActivateDeactivate(!!msg.value);
         } else if (msg.type === 'refreshSchema') {
           await vscode.commands.executeCommand('ciscoCodec.refreshSchema');
         } else if (msg.type === 'showSchemaJson') {
           await vscode.commands.executeCommand('ciscoCodec.showSchemaJson');
         } else if (msg.type === 'setConfirmMacroDelete') {
-          await vscode.workspace.getConfiguration('codec').update('confirmMacroDelete', !!msg.value, vscode.ConfigurationTarget.Global);
+          await cfg.setConfirmMacroDelete(!!msg.value);
         } else if (msg.type === 'setConfirmFrameworkRestart') {
-          await vscode.workspace.getConfiguration('codec').update('confirmFrameworkRestart', !!msg.value, vscode.ConfigurationTarget.Global);
+          await cfg.setConfirmFrameworkRestart(!!msg.value);
         } else if (msg.type === 'setForcedProduct') {
           await vscode.commands.executeCommand('ciscoCodec.setForcedProduct', String(msg.value || 'auto'));
         } else if (msg.type === 'setApplySchema') {
-          await vscode.workspace.getConfiguration('codec').update('applySchemaToIntellisense', !!msg.value, vscode.ConfigurationTarget.Global);
+          await cfg.setApplySchemaToIntellisense(!!msg.value);
         }
         await this.postState();
       } catch (e: any) {
@@ -56,7 +60,7 @@ export class ProfilesWebview {
       }
     });
 
-    this.panel.webview.html = this.renderHtml();
+    this.panel.webview.html = await this.getHtmlForWebview(this.panel.webview);
     await this.postState();
   }
 
@@ -64,12 +68,13 @@ export class ProfilesWebview {
     if (!this.panel) return;
     const profiles = await this.store.listProfiles();
     const activeId = await this.store.getActiveProfileId();
-    const autoRestart = vscode.workspace.getConfiguration('codec').get<boolean>('autoRestartOnSave', false);
-    const autoRestartOnActivateDeactivate = vscode.workspace.getConfiguration('codec').get<boolean>('autoRestartOnActivateDeactivate', false);
-    const applySchema = vscode.workspace.getConfiguration('codec').get<boolean>('applySchemaToIntellisense', true);
-    const confirmMacroDelete = vscode.workspace.getConfiguration('codec').get<boolean>('confirmMacroDelete', true);
-    const confirmFrameworkRestart = vscode.workspace.getConfiguration('codec').get<boolean>('confirmFrameworkRestart', true);
-    const forcedProduct = vscode.workspace.getConfiguration('codec').get<string>('forcedProduct', 'auto');
+    const cfg = new CodecConfig();
+    const autoRestart = cfg.autoRestartOnSave;
+    const autoRestartOnActivateDeactivate = cfg.autoRestartOnActivateDeactivate;
+    const applySchema = cfg.applySchemaToIntellisense;
+    const confirmMacroDelete = cfg.confirmMacroDelete;
+    const confirmFrameworkRestart = cfg.confirmFrameworkRestart;
+    const forcedProduct = cfg.forcedProduct;
     // Query schema status via command invocation – use commands to avoid tight coupling.
     const status = await vscode.commands.executeCommand('ciscoCodec.getSchemaStatus');
     const knownProducts = await vscode.commands.executeCommand('ciscoCodec.getKnownProducts');
@@ -393,6 +398,22 @@ export class ProfilesWebview {
   </table>
 </body>
 </html>`;
+  }
+
+  private async getHtmlForWebview(webview: vscode.Webview): Promise<string> {
+    const nonce = getNonce();
+    const cspSource = webview.cspSource;
+    const scriptUri = getMediaUri(webview, this.context.extensionUri, ['media','profiles','main.js']);
+    const stylesUri = getMediaUri(webview, this.context.extensionUri, ['media','profiles','styles.css']);
+    const indexUri = vscode.Uri.joinPath(this.context.extensionUri, 'media','profiles','index.html');
+    const bytes = await vscode.workspace.fs.readFile(indexUri);
+    let html = Buffer.from(bytes).toString('utf8');
+    html = html
+      .replace(/%CSP_SOURCE%/g, cspSource)
+      .replace(/%NONCE%/g, nonce)
+      .replace(/%SCRIPT_URI%/g, scriptUri.toString())
+      .replace(/%STYLES_URI%/g, stylesUri.toString());
+    return html;
   }
 }
 

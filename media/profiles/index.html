@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src %CSP_SOURCE% https:; style-src %CSP_SOURCE%; script-src %CSP_SOURCE% 'nonce-%NONCE%'; font-src %CSP_SOURCE%" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <link rel="stylesheet" href="%STYLES_URI%" />
+  <title>Settings</title>
+</head>
+<body>
+  <h2>Settings</h2>
+  <div class="section">
+    <label style="display:flex;align-items:center;gap:6px;white-space:nowrap;">
+      <input id="autoRestart" type="checkbox" />
+      Automatically restart macro framework when saving a macro
+    </label>
+    <br/>
+    <label style="display:flex;align-items:center;gap:6px;white-space:nowrap;">
+      <input id="autoRestartOnActivateDeactivate" type="checkbox" /> Automatically restart macro framework when activating or deactivating a macro
+    </label>
+    <br/>
+    <label style="display:flex;align-items:center;gap:6px;white-space:nowrap;">
+      <input id="confirmMacroDelete" type="checkbox" /> Confirm before deleting a macro
+    </label>
+    <br/>
+    <label style="display:flex;align-items:center;gap:6px;white-space:nowrap;">
+      <input id="confirmFrameworkRestart" type="checkbox" /> Confirm before restarting Macro Framework
+      </label>
+    <br/>
+    <label style="display:flex;align-items:center;gap:6px;white-space:nowrap;">
+      <input id="applySchema" type="checkbox" /> Apply xAPI schema to IntelliSense (completions and hovers)
+    </label>
+    <br/>
+  </div>
+  <div class="section">
+    <h2>Schema</h2>
+    <div class="schemaBox">
+      <div class="schemaRow">
+        <div><strong>Status:</strong> <span id="schemaLoaded">—</span></div>
+        <div class="schemaMeta" id="schemaMeta"></div>
+        <div style="display:flex;gap:8px;">
+          <button id="btnRefreshSchema">Refresh</button>
+          <button id="btnShowSchemaJson">View JSON</button>
+        </div>
+      </div>
+      <div class="schemaRow" style="margin-top:8px;">
+        <div><strong>Product:</strong></div>
+        <div style="flex:1"></div>
+        <select id="forcedProduct" style="min-width:260px"></select>
+      </div>
+    </div>
+  </div>
+  <h2>Directory</h2>
+  <div class="toolbar">
+    <div class="left">
+      <input id="label" placeholder="Label" type="text" />
+      <input id="host" placeholder="Host" type="text" />
+      <input id="username" placeholder="Username" value="admin" type="text" />
+      <input id="password" placeholder="Password" type="password" />
+      <button id="addBtn">Add</button>
+    </div>
+    <div class="right">
+      <input id="filter" placeholder="Filter profiles" type="text" />
+    </div>
+  </div>
+  <table>
+    <colgroup>
+      <col class="col-active" />
+      <col class="col-label" />
+      <col class="col-host" />
+      <col class="col-user" />
+      <col class="col-actions" />
+    </colgroup>
+    <thead>
+      <tr>
+        <th class="col-active sort muted" data-key="active">Active <span class="arrow"></span></th>
+        <th class="col-label sort" data-key="label">Label <span class="arrow"></span></th>
+        <th class="col-host sort" data-key="host">Host <span class="arrow"></span></th>
+        <th class="col-user sort" data-key="username">Username <span class="arrow"></span></th>
+        <th class="col-actions"></th>
+      </tr>
+    </thead>
+    <tbody id="tbody"></tbody>
+  </table>
+
+  <script nonce="%NONCE%" src="%SCRIPT_URI%"></script>
+</body>
+</html>
+
+

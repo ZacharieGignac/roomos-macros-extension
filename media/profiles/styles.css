@@ -1,0 +1,27 @@
+body { font-family: var(--vscode-font-family); padding: 12px; color: var(--vscode-foreground); }
+h2 { margin: 0 0 12px 0; }
+.toolbar { display: flex; gap: 12px; align-items: center; justify-content: space-between; }
+.toolbar .left, .toolbar .right { display: flex; gap: 8px; align-items: center; }
+.toolbar input[type="text"], .toolbar input[type="password"] { width: 160px; }
+.toolbar button { cursor: pointer; }
+
+table { width: 100%; border-collapse: collapse; margin-top: 12px; table-layout: fixed; }
+thead th { position: sticky; top: 0; background: var(--vscode-editor-background); z-index: 1; }
+th, td { border-bottom: 1px solid var(--vscode-editorGroup-border); padding: 8px; text-overflow: ellipsis; overflow: hidden; white-space: nowrap; }
+th { text-align: left; }
+tbody tr:hover { background: var(--vscode-list-hoverBackground); }
+tr.active { background: var(--vscode-list-inactiveSelectionBackground); }
+.col-active { width: 72px; }
+th.col-active, td.col-active { text-align: center; }
+.col-actions { width: 260px; }
+.actions button { margin-right: 6px; }
+.muted { opacity: 0.8; }
+.sort { cursor: pointer; user-select: none; }
+.sort .arrow { margin-left: 6px; opacity: 0.8; }
+.inputs-inline input { height: 24px; }
+.section { margin-top: 12px; }
+.schemaBox { border: 1px solid var(--vscode-editorGroup-border); padding: 8px; border-radius: 4px; }
+.schemaRow { display:flex; gap:8px; align-items:center; justify-content: space-between; }
+.schemaMeta { opacity: 0.8; font-size: 12px; }
+
+
