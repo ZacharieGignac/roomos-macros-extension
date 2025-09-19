@@ -180,6 +180,16 @@
           "command": "ciscoCodec.insertXapiStub",
           "when": "resourceScheme == codecfs && editorLangId =~ /(javascript|typescript|javascriptreact|typescriptreact)/",
           "group": "navigation@8"
+        },
+        {
+          "command": "ciscoCodec.activateMacro",
+          "when": "resourceScheme == codecfs && editorLangId =~ /(javascript|typescript|javascriptreact|typescriptreact)/",
+          "group": "navigation@7"
+        },
+        {
+          "command": "ciscoCodec.deactivateMacro",
+          "when": "resourceScheme == codecfs && editorLangId =~ /(javascript|typescript|javascriptreact|typescriptreact)/",
+          "group": "navigation@7"
         }
       ]
     }

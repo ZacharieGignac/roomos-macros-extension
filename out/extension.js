@@ -653,7 +653,13 @@ async function activate(context) {
         const mgr = getManagerOrWarn();
         if (!mgr)
             return;
-        const macroName = typeof arg === 'string' ? arg : arg?.label;
+        let macroName = typeof arg === 'string' ? arg : arg?.label;
+        if (!macroName) {
+            const doc = vscode.window.activeTextEditor?.document;
+            if (doc?.uri.scheme === 'codecfs') {
+                macroName = doc.uri.path.replace(/^\//, '').replace(/\.js$/, '');
+            }
+        }
         if (!macroName)
             return;
         try {
@@ -679,7 +685,13 @@ async function activate(context) {
         const mgr = getManagerOrWarn();
         if (!mgr)
             return;
-        const macroName = typeof arg === 'string' ? arg : arg?.label;
+        let macroName = typeof arg === 'string' ? arg : arg?.label;
+        if (!macroName) {
+            const doc = vscode.window.activeTextEditor?.document;
+            if (doc?.uri.scheme === 'codecfs') {
+                macroName = doc.uri.path.replace(/^\//, '').replace(/\.js$/, '');
+            }
+        }
         if (!macroName)
             return;
         try {

@@ -665,7 +665,13 @@ export async function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand('ciscoCodec.activateMacro', async (arg: any) => {
       const mgr = getManagerOrWarn();
       if (!mgr) return;
-      const macroName = typeof arg === 'string' ? arg : arg?.label;
+      let macroName = typeof arg === 'string' ? arg : arg?.label;
+      if (!macroName) {
+        const doc = vscode.window.activeTextEditor?.document;
+        if (doc?.uri.scheme === 'codecfs') {
+          macroName = doc.uri.path.replace(/^\//, '').replace(/\.js$/, '');
+        }
+      }
       if (!macroName) return;
       try {
         await mgr.activate(macroName);
@@ -690,7 +696,13 @@ export async function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand('ciscoCodec.deactivateMacro', async (arg: any) => {
       const mgr = getManagerOrWarn();
       if (!mgr) return;
-      const macroName = typeof arg === 'string' ? arg : arg?.label;
+      let macroName = typeof arg === 'string' ? arg : arg?.label;
+      if (!macroName) {
+        const doc = vscode.window.activeTextEditor?.document;
+        if (doc?.uri.scheme === 'codecfs') {
+          macroName = doc.uri.path.replace(/^\//, '').replace(/\.js$/, '');
+        }
+      }
       if (!macroName) return;
       try {
         await mgr.deactivate(macroName);
