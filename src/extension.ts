@@ -314,12 +314,12 @@ export async function activate(context: vscode.ExtensionContext) {
     const manager = new MacroManager(active.host, active.username, pass);
     currentManager = manager;
     currentProfileId = active.id;
-    statusBarService.bind(manager, active.host);
+    statusBarService.bind(manager, active.label || active.host);
     const connectedManager = await connectWithHandling(manager, active);
     if (connectedManager) {
       currentManager = connectedManager;
       vscode.window.showInformationMessage(`Connected to codec at ${active.host}`);
-      statusBarService.bind(currentManager, active.host);
+      statusBarService.bind(currentManager, active.label || active.host);
       macroLogService.bind(currentManager);
     }
     // Register filesystem
@@ -422,7 +422,7 @@ export async function activate(context: vscode.ExtensionContext) {
         const effectiveManager = connected;
         currentManager = effectiveManager;
         currentProfileId = selected.id;
-        statusBarService.bind(effectiveManager, selected.host);
+        statusBarService.bind(effectiveManager, selected.label || selected.host);
         macroLogService.bind(effectiveManager);
 
         // Re-register provider to ensure fresh handle after reconnect

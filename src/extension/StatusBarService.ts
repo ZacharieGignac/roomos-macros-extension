@@ -16,9 +16,9 @@ export class StatusBarService {
     this.statusBar.show();
   }
 
-  bind(manager: MacroManager, host: string) {
+  bind(manager: MacroManager, name: string) {
     if (this.unbind) this.unbind();
-    const update = () => this.updateFromState(manager.getState(), host);
+    const update = () => this.updateFromState(manager.getState(), name);
     update();
     const off = manager.onStateChange(() => update());
     this.unbind = () => {
@@ -27,21 +27,21 @@ export class StatusBarService {
     };
   }
 
-  private updateFromState(state: ConnectionState, host: string) {
+  private updateFromState(state: ConnectionState, name: string) {
     const setConnectedContext = (connected: boolean) => {
       vscode.commands.executeCommand('setContext', 'codec.connected', connected);
     };
     if (state === 'ready') {
-      this.statusBar.text = '$(check) RoomOS: Connected';
-      this.statusBar.tooltip = `Connected to ${host}`;
+      this.statusBar.text = `$(check) RoomOS: Connected to ${name}`;
+      this.statusBar.tooltip = `Connected to ${name}`;
       setConnectedContext(true);
     } else if (state === 'connecting') {
       this.statusBar.text = '$(sync~spin) RoomOS: Connecting…';
-      this.statusBar.tooltip = `Connecting to ${host}`;
+      this.statusBar.tooltip = `Connecting to ${name}`;
       setConnectedContext(false);
     } else if (state === 'reconnecting') {
       this.statusBar.text = '$(sync~spin) RoomOS: Reconnecting…';
-      this.statusBar.tooltip = `Reconnecting to ${host}`;
+      this.statusBar.tooltip = `Reconnecting to ${name}`;
       setConnectedContext(false);
     } else if (state === 'disconnected') {
       this.statusBar.text = '$(debug-disconnect) RoomOS: Disconnected';
@@ -49,7 +49,7 @@ export class StatusBarService {
       setConnectedContext(false);
     } else if (state === 'error') {
       this.statusBar.text = '$(error) RoomOS: Error';
-      this.statusBar.tooltip = `Connection error for ${host}`;
+      this.statusBar.tooltip = `Connection error for ${name}`;
       setConnectedContext(false);
     } else {
       this.statusBar.text = '$(gear) RoomOS';
