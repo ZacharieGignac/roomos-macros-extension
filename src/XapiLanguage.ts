@@ -61,6 +61,8 @@ export class XapiCompletionProvider implements vscode.CompletionItemProvider {
     _token: vscode.CancellationToken,
     context?: vscode.CompletionContext
   ): Promise<vscode.CompletionItem[] | undefined> {
+    const enableSchemaIntellisense = vscode.workspace.getConfiguration('codec').get<boolean>('applySchemaToIntellisense', true);
+    if (!enableSchemaIntellisense) return undefined;
     const lineText = document.lineAt(position.line).text.slice(0, position.character);
     const ctx = parseXapiContext(lineText);
     if (!ctx.found) return undefined;

@@ -24,8 +24,9 @@ export async function activate(context: vscode.ExtensionContext) {
   let xapiHelpPanel: vscode.WebviewPanel | null = null;
   const statusBarService = new StatusBarService();
   const macroLogService = new MacroLogService();
+  const connectionDebugChannel = vscode.window.createOutputChannel('RoomOS Macro Connection');
   let dirtyTracker: DirtyMacroTracker | null = null;
-  context.subscriptions.push({ dispose: () => statusBarService.dispose() }, { dispose: () => macroLogService.dispose() });
+  context.subscriptions.push({ dispose: () => statusBarService.dispose() }, { dispose: () => macroLogService.dispose() }, connectionDebugChannel);
   const getManagerOrWarn = (): MacroManager | null => {
     if (!currentManager) {
       vscode.window.showWarningMessage('No active codec connection. Add and activate a profile in Settings.');
@@ -311,7 +312,26 @@ export async function activate(context: vscode.ExtensionContext) {
     const active = all.find(p => p.id === activeId)!;
     const pass = (await profiles.getPassword(active.id)) || '';
 
-    const manager = new MacroManager(active.host, active.username, pass);
+  const manager = new MacroManager(active.host, active.username, pass, (active as any).connectionMethod || 'ssh');
+    // Stream MacroManager debug logs to a dedicated Output channel
+    const removeDebug = manager.onDebug((message: string, details?: any) => {
+      const ts = new Date().toISOString();
+      let detailsText = '';
+      if (details !== undefined) {
+        try {
+          detailsText = ' ' + JSON.stringify(details, (_k, v) => {
+            if (v instanceof Error) {
+              return { name: v.name, message: v.message, stack: v.stack };
+            }
+            return v;
+          });
+        } catch {
+          try { detailsText = ' ' + String(details); } catch {}
+        }
+      }
+      connectionDebugChannel.appendLine(`[${ts}] [${active.host}] ${message}${detailsText}`);
+    });
+    context.subscriptions.push({ dispose: () => removeDebug() });
     currentManager = manager;
     currentProfileId = active.id;
     statusBarService.bind(manager, active.label || active.host);
@@ -413,7 +433,7 @@ export async function activate(context: vscode.ExtensionContext) {
         const password = (await profiles.getPassword(selected.id)) || '';
         // Cleanly disconnect previous manager before switching
         try { await currentManager?.disconnect(); } catch {}
-        const newManager = new MacroManager(selected.host, selected.username, password);
+  const newManager = new MacroManager(selected.host, selected.username, password, (selected as any).connectionMethod || 'ssh');
         const connected = await connectWithHandling(newManager, selected);
         if (!connected) {
           // Keep using existing manager if connection failed
@@ -474,7 +494,7 @@ export async function activate(context: vscode.ExtensionContext) {
         try {
           await profiles.updateProfile(profile.id, {}, newPassword);
           const updatedPassword = (await profiles.getPassword(profile.id)) || '';
-          const retryManager = new MacroManager(profile.host, profile.username, updatedPassword);
+          const retryManager = new MacroManager(profile.host, profile.username, updatedPassword, (profile as any).connectionMethod || 'ssh');
           await vscode.window.withProgress({ location: vscode.ProgressLocation.Window, title: `Reconnecting to ${profile.host}…` }, async () => {
             await withTimeout(retryManager.connect(), 10000, 'connect');
           });
@@ -773,7 +793,12 @@ async function promptAddProfile(profiles: ProfileStore) {
   if (!username) return;
   const password = await vscode.window.showInputBox({ prompt: 'Password', password: true });
   if (password === undefined) return;
-  return profiles.addProfile(label, host, username, password);
+  const methodPick = await vscode.window.showQuickPick([
+    { label: 'SSH (recommended)', value: 'ssh', description: 'Use SSH session for xAPI (default)' },
+    { label: 'WebSocket Secure (WSS)', value: 'wss', description: 'Use wss:// connection' }
+  ], { placeHolder: 'Select connection method', ignoreFocusOut: true });
+  const connectionMethod = (methodPick?.value === 'wss') ? 'wss' : 'ssh';
+  return profiles.addProfile(label, host, username, password, connectionMethod);
 }
 
 export function deactivate() {}

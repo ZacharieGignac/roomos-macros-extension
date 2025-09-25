@@ -5,6 +5,8 @@ export interface CodecProfileInfo {
   label: string;
   host: string;
   username: string;
+  /** Connection method: ssh (default) or wss */
+  connectionMethod?: 'ssh' | 'wss';
 }
 
 const PROFILES_KEY = 'codec.profiles';
@@ -15,7 +17,9 @@ export class ProfileStore {
   constructor(private context: vscode.ExtensionContext) {}
 
   async listProfiles(): Promise<CodecProfileInfo[]> {
-    return this.context.globalState.get<CodecProfileInfo[]>(PROFILES_KEY, []);
+    const stored = this.context.globalState.get<CodecProfileInfo[]>(PROFILES_KEY, []);
+    // Backward compat: older profiles lack connectionMethod, default to 'ssh'
+    return stored.map(p => ({ ...p, connectionMethod: p.connectionMethod === 'wss' ? 'wss' : 'ssh' }));
   }
 
   async getActiveProfileId(): Promise<string | undefined> {
@@ -30,11 +34,11 @@ export class ProfileStore {
     return this.context.secrets.get(secretKey(id));
   }
 
-  async addProfile(label: string, host: string, username: string, password: string): Promise<CodecProfileInfo> {
+  async addProfile(label: string, host: string, username: string, password: string, connectionMethod: 'ssh' | 'wss' = 'ssh'): Promise<CodecProfileInfo> {
     const id = `${host}|${username}`;
     const profiles = await this.listProfiles();
     const exists = profiles.find(p => p.id === id);
-    const profile: CodecProfileInfo = { id, label, host, username };
+    const profile: CodecProfileInfo = { id, label, host, username, connectionMethod };
     const next = exists
       ? profiles.map(p => (p.id === id ? profile : p))
       : [...profiles, profile];
@@ -56,7 +60,7 @@ export class ProfileStore {
 
   async updateProfile(
     originalId: string,
-    updates: Partial<Omit<CodecProfileInfo, 'id'>> & { label?: string; host?: string; username?: string },
+    updates: Partial<Omit<CodecProfileInfo, 'id'>> & { label?: string; host?: string; username?: string; connectionMethod?: 'ssh' | 'wss' },
     newPassword?: string
   ): Promise<CodecProfileInfo> {
     const profiles = await this.listProfiles();
@@ -68,7 +72,8 @@ export class ProfileStore {
       ...existing,
       label: updates.label ?? existing.label,
       host: updates.host ?? existing.host,
-      username: updates.username ?? existing.username
+      username: updates.username ?? existing.username,
+      connectionMethod: updates.connectionMethod ?? existing.connectionMethod ?? 'ssh'
     };
     const newId = `${updated.host}|${updated.username}`;
     updated.id = newId;

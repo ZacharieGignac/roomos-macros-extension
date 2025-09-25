@@ -14,6 +14,7 @@ tr.active { background: var(--vscode-list-inactiveSelectionBackground); }
 .col-active { width: 72px; }
 th.col-active, td.col-active { text-align: center; }
 .col-actions { width: 260px; }
+.col-method { width: 110px; }
 .actions button { margin-right: 6px; }
 .muted { opacity: 0.8; }
 .sort { cursor: pointer; user-select: none; }

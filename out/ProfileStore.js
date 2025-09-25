@@ -9,7 +9,9 @@ class ProfileStore {
         this.context = context;
     }
     async listProfiles() {
-        return this.context.globalState.get(PROFILES_KEY, []);
+        const stored = this.context.globalState.get(PROFILES_KEY, []);
+        // Backward compat: older profiles lack connectionMethod, default to 'ssh'
+        return stored.map(p => ({ ...p, connectionMethod: p.connectionMethod === 'wss' ? 'wss' : 'ssh' }));
     }
     async getActiveProfileId() {
         return this.context.globalState.get(ACTIVE_PROFILE_KEY);
@@ -20,11 +22,11 @@ class ProfileStore {
     async getPassword(id) {
         return this.context.secrets.get(secretKey(id));
     }
-    async addProfile(label, host, username, password) {
+    async addProfile(label, host, username, password, connectionMethod = 'ssh') {
         const id = `${host}|${username}`;
         const profiles = await this.listProfiles();
         const exists = profiles.find(p => p.id === id);
-        const profile = { id, label, host, username };
+        const profile = { id, label, host, username, connectionMethod };
         const next = exists
             ? profiles.map(p => (p.id === id ? profile : p))
             : [...profiles, profile];
@@ -52,7 +54,8 @@ class ProfileStore {
             ...existing,
             label: updates.label ?? existing.label,
             host: updates.host ?? existing.host,
-            username: updates.username ?? existing.username
+            username: updates.username ?? existing.username,
+            connectionMethod: updates.connectionMethod ?? existing.connectionMethod ?? 'ssh'
         };
         const newId = `${updated.host}|${updated.username}`;
         updated.id = newId;

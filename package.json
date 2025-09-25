@@ -27,18 +27,6 @@
     },
     "configuration": {
       "properties": {
-        "codec.host": {
-          "type": "string",
-          "description": "Codec IP address"
-        },
-        "codec.username": {
-          "type": "string",
-          "description": "Codec username"
-        },
-        "codec.password": {
-          "type": "string",
-          "description": "Codec password"
-        },
         "codec.autoRestartOnSave": {
           "type": "boolean",
           "default": true,

@@ -57,6 +57,9 @@ class XapiCompletionProvider {
         this.schema = schema;
     }
     async provideCompletionItems(document, position, _token, context) {
+        const enableSchemaIntellisense = vscode.workspace.getConfiguration('codec').get('applySchemaToIntellisense', true);
+        if (!enableSchemaIntellisense)
+            return undefined;
         const lineText = document.lineAt(position.line).text.slice(0, position.character);
         const ctx = parseXapiContext(lineText);
         if (!ctx.found)

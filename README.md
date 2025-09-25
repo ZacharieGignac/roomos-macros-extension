@@ -23,6 +23,7 @@ Edit and manage Cisco RoomOS codec macros directly from VS Code. Browse, open, e
 - VS Code 1.75+
 - Network access to the Cisco codec (Room/Board/Desk series)
 - Admin credentials on the target codec
+  - SSH or WebSocket (wss) access. SSH is now the default connection method; you can switch per profile.
 
 ### Installation (development)
 
@@ -130,7 +131,10 @@ When a `codecfs:` document has unsaved changes, its item in the tree shows the d
 ### Troubleshooting
 
 - Cannot connect
-  - Verify IP/hostname, credentials, and that the codec allows WebSocket connections over `wss:`
+  - If using SSH (default): ensure SSH is enabled on the codec and reachable (try `ssh admin@<host>` outside VS Code).
+  - If using WebSocket (WSS): verify IP/hostname, credentials, and that the codec allows WebSocket connections over `wss:`.
+  - Check certificate trust issues for WSS (self‑signed certs may fail TLS validation).
+  - Switch connection method (SSH/WSS) in Settings → edit profile if one method is blocked by network policy.
 
 
 ### Development scripts

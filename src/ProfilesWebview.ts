@@ -27,7 +27,7 @@ export class ProfilesWebview {
       try {
         const cfg = new CodecConfig();
         if (msg.type === 'add') {
-          await this.store.addProfile(msg.label, msg.host, msg.username, msg.password);
+          await this.store.addProfile(msg.label, msg.host, msg.username, msg.password, msg.connectionMethod || 'ssh');
         } else if (msg.type === 'setActive') {
           await this.store.setActiveProfileId(msg.id);
           await vscode.commands.executeCommand('ciscoCodec.reloadForActiveProfile');
@@ -66,7 +66,7 @@ export class ProfilesWebview {
 
   private async postState() {
     if (!this.panel) return;
-    const profiles = await this.store.listProfiles();
+  const profiles = await this.store.listProfiles();
     const activeId = await this.store.getActiveProfileId();
     const cfg = new CodecConfig();
     const autoRestart = cfg.autoRestartOnSave;

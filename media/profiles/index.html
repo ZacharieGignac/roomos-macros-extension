@@ -57,6 +57,10 @@
       <input id="host" placeholder="Host" type="text" />
       <input id="username" placeholder="Username" value="admin" type="text" />
       <input id="password" placeholder="Password" type="password" />
+      <select id="connectionMethod">
+        <option value="ssh" selected>SSH</option>
+        <option value="wss">WebSocket</option>
+      </select>
       <button id="addBtn">Add</button>
     </div>
     <div class="right">
@@ -69,6 +73,7 @@
       <col class="col-label" />
       <col class="col-host" />
       <col class="col-user" />
+  <col class="col-method" />
       <col class="col-actions" />
     </colgroup>
     <thead>
@@ -77,6 +82,7 @@
         <th class="col-label sort" data-key="label">Label <span class="arrow"></span></th>
         <th class="col-host sort" data-key="host">Host <span class="arrow"></span></th>
         <th class="col-user sort" data-key="username">Username <span class="arrow"></span></th>
+        <th class="col-method sort" data-key="connectionMethod">Method <span class="arrow"></span></th>
         <th class="col-actions"></th>
       </tr>
     </thead>

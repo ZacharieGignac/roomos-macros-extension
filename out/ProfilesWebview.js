@@ -23,7 +23,7 @@ class ProfilesWebview {
             try {
                 const cfg = new CodecConfig_1.CodecConfig();
                 if (msg.type === 'add') {
-                    await this.store.addProfile(msg.label, msg.host, msg.username, msg.password);
+                    await this.store.addProfile(msg.label, msg.host, msg.username, msg.password, msg.connectionMethod || 'ssh');
                 }
                 else if (msg.type === 'setActive') {
                     await this.store.setActiveProfileId(msg.id);
