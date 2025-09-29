@@ -2,7 +2,7 @@
   "name": "roomos-macros-extension",
   "displayName": "RoomOS Macro Editor",
   "description": "Edit Cisco codec macros directly from VS Code",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "publisher": "ZacharieGignac",
   "license": "MIT",
   "icon": "images/icon.png",
@@ -21,7 +21,8 @@
       "explorer": [
         {
           "id": "codecMacrosExplorer",
-          "name": "RoomOS Macros"
+          "name": "RoomOS Macros",
+          "icon": "images/icon.png"
         }
       ]
     },
