@@ -1,6 +1,6 @@
-## RoomOS Macro Editor
+## Macros Virtual Filesystem for Cisco Codecs
 
-Edit Cisco RoomOS codec macros directly from VS Code.
+Edit Cisco codec macros directly from VS Code via a virtual filesystem.
 
 ### Features
 
@@ -24,7 +24,7 @@ Edit Cisco RoomOS codec macros directly from VS Code.
 - Or via CLI:
 
 ```bash
-code --install-extension dist/RoomOS-Macro-Editor-<version>.vsix
+code --install-extension dist/Macros-Virtual-Filesystem-for-Cisco-Codecs-<version>.vsix
 ```
 
 ### Build locally

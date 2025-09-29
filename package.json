@@ -1,6 +1,6 @@
 {
   "name": "roomos-macros-extension",
-  "displayName": "RoomOS Macro Editor",
+  "displayName": "Macros Virtual Filesystem for Cisco Codecs",
   "description": "Edit Cisco codec macros directly from VS Code",
   "version": "0.6.0",
   "publisher": "ZacharieGignac",
@@ -191,8 +191,8 @@
     "pretest": "npm run build",
     "test": "node ./out/test/runTest.js",
     "makedist": "node -e \"require('fs').mkdirSync('dist',{recursive:true})\"",
-    "pak": "npm run compile && npm run build && npm run makedist && vsce package --out dist/RoomOS-Macro-Editor-%npm_package_version%.vsix",
-    "devpak": "npm run compile && npm run build && npm run makedist && node -e \"const {spawnSync}=require('child_process');const d=new Date();const pad=n=>String(n).padStart(2,'0');const out='dist/RoomOS-Macro-Editor-'+d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+'.vsix';const r=spawnSync('vsce',['package','--out',out],{stdio:'inherit',shell:true});if(r.status)process.exit(r.status);\""
+  "pak": "npm run compile && npm run build && npm run makedist && vsce package --out dist/Macros-Virtual-Filesystem-for-Cisco-Codecs-%npm_package_version%.vsix",
+  "devpak": "npm run compile && npm run build && npm run makedist && node -e \"const {spawnSync}=require('child_process');const d=new Date();const pad=n=>String(n).padStart(2,'0');const out='dist/Macros-Virtual-Filesystem-for-Cisco-Codecs-'+d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+'.vsix';const r=spawnSync('vsce',['package','--out',out],{stdio:'inherit',shell:true});if(r.status)process.exit(r.status);\""
   },
   "devDependencies": {
     "@types/node": "^18.0.0",
