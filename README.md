@@ -2,6 +2,11 @@
 
 Edit Cisco codec macros directly from VS Code via a virtual filesystem.
 
+### Install from Marketplace
+
+Install directly from the VS Code Marketplace:
+https://marketplace.visualstudio.com/items?itemName=ZacharieGignac.roomos-macros-extension
+
 ### Features
 
 - Browse, open, and edit device macros via a virtual filesystem (`codecfs:`)
