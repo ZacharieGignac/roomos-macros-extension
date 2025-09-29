@@ -17,6 +17,16 @@ Edit Cisco RoomOS codec macros directly from VS Code.
 3) Select your profile and browse your macros
 4) Open a macro and press Ctrl+S to save changes back to the device
 
+### Install (.vsix)
+
+- Get the VSIX file (from a release or by building locally via `npm run pak`).
+- In VS Code: Extensions view → three-dot menu → Install from VSIX… → pick the file.
+- Or via CLI:
+
+```bash
+code --install-extension dist/RoomOS-Macro-Editor-<version>.vsix
+```
+
 ### Build locally
 
 - Install dependencies: `npm ci`
@@ -32,8 +42,9 @@ Edit Cisco RoomOS codec macros directly from VS Code.
 ### License
 
 MIT
-   - Press F5 (Run Extension) to open a Development Host
 
+Cisco and RoomOS © 2025 Cisco Systems, Inc. and/or its affiliates. All rights reserved.
 
+Cisco and the Cisco logo are trademarks or registered trademarks of Cisco and/or its affiliates in the U.S. and other countries.
 
-### Getting started
+This project is an independent community project and is not affiliated with, sponsored, or endorsed by Cisco.

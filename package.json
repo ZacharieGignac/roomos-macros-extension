@@ -211,6 +211,7 @@
     "out/**",
     "images/icon.png",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "NOTICE"
   ]
 }
