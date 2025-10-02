@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 
 The format is inspired by Keep a Changelog. Versions follow Semantic Versioning.
 
+## [0.6.1] - 2025-10-02
+
+### Changed
+- Temporarily force all connections to WSS to avoid a critical SSH save bug.
+- Default connection method to WSS when adding new codecs.
+
+### Note
+- SSH selection is accepted in UI but is treated as WSS until the bug is fixed.
+
 ## [0.6.0] - 2025-09-29
 
 ### Added
@@ -29,3 +38,4 @@ The format is inspired by Keep a Changelog. Versions follow Semantic Versioning.
 - Updated README and added `README_DAILY.md`.
 
 [0.6.0]: https://github.com/ZacharieGignac/roomos-macros-extension/releases/tag/v0.6.0
+[0.6.1]: https://github.com/ZacharieGignac/roomos-macros-extension/releases/tag/v0.6.1
