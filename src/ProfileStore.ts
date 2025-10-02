@@ -18,8 +18,8 @@ export class ProfileStore {
 
   async listProfiles(): Promise<CodecProfileInfo[]> {
     const stored = this.context.globalState.get<CodecProfileInfo[]>(PROFILES_KEY, []);
-    // Backward compat: older profiles lack connectionMethod, default to 'ssh'
-    return stored.map(p => ({ ...p, connectionMethod: p.connectionMethod === 'wss' ? 'wss' : 'ssh' }));
+    // Backward compat: older profiles lack connectionMethod; temporarily default to 'wss' while SSH bug is addressed
+    return stored.map(p => ({ ...p, connectionMethod: p.connectionMethod === 'ssh' ? 'ssh' : 'wss' }));
   }
 
   async getActiveProfileId(): Promise<string | undefined> {
@@ -34,7 +34,7 @@ export class ProfileStore {
     return this.context.secrets.get(secretKey(id));
   }
 
-  async addProfile(label: string, host: string, username: string, password: string, connectionMethod: 'ssh' | 'wss' = 'ssh'): Promise<CodecProfileInfo> {
+  async addProfile(label: string, host: string, username: string, password: string, connectionMethod: 'ssh' | 'wss' = 'wss'): Promise<CodecProfileInfo> {
     const id = `${host}|${username}`;
     const profiles = await this.listProfiles();
     const exists = profiles.find(p => p.id === id);
@@ -73,7 +73,8 @@ export class ProfileStore {
       label: updates.label ?? existing.label,
       host: updates.host ?? existing.host,
       username: updates.username ?? existing.username,
-      connectionMethod: updates.connectionMethod ?? existing.connectionMethod ?? 'ssh'
+      // Prefer WSS by default during SSH bug period
+      connectionMethod: updates.connectionMethod ?? existing.connectionMethod ?? 'wss'
     };
     const newId = `${updated.host}|${updated.username}`;
     updated.id = newId;

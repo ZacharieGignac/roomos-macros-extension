@@ -9,6 +9,9 @@
 </head>
 <body>
   <h2>Settings</h2>
+  <div class="warningBanner">
+    <strong>Important:</strong> Due to an issue affecting saves over SSH, all connections are currently <strong>forced to WSS</strong> even if SSH is selected. SSH will be restored once the bug is fixed.
+  </div>
   <div class="section">
     <label style="display:flex;align-items:center;gap:6px;white-space:nowrap;">
       <input id="autoRestart" type="checkbox" />
@@ -58,8 +61,8 @@
       <input id="username" placeholder="Username" value="admin" type="text" />
       <input id="password" placeholder="Password" type="password" />
       <select id="connectionMethod">
-        <option value="ssh" selected>SSH</option>
-        <option value="wss">WebSocket</option>
+        <option value="wss" selected>WebSocket (WSS)</option>
+        <option value="ssh">SSH (treated as WSS for now)</option>
       </select>
       <button id="addBtn">Add</button>
     </div>

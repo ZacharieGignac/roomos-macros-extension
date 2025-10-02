@@ -20,7 +20,7 @@ class MacroManager {
             catch { }
         }
     }
-    constructor(host, username, password, connectionMethod = 'ssh') {
+    constructor(host, username, password, connectionMethod = 'wss') {
         this.host = host;
         this.username = username;
         this.password = password;
@@ -40,8 +40,9 @@ class MacroManager {
         this.reconnectScheduled = false;
         this.logDebug('connect() called');
         this.setState(this.state === 'disconnected' || this.state === 'idle' ? 'connecting' : 'reconnecting');
-        this.logDebug('attempting jsxapi connect', { host: this.host, username: this.username, method: this.connectionMethod });
-        const protocol = this.connectionMethod === 'wss' ? 'wss:' : 'ssh:';
+        this.logDebug('attempting jsxapi connect', { host: this.host, username: this.username, method: this.connectionMethod, note: 'forcing WSS due to temporary SSH bug' });
+        // Temporarily force WSS for all connections while SSH save bug is investigated
+        const protocol = 'wss:';
         const x = await (0, jsxapi_1.connect)({
             host: this.host,
             username: this.username,
@@ -66,10 +67,10 @@ class MacroManager {
         return match?.Content ?? '';
     }
     async save(name, content) {
-        await this.xapi.Command.Macros.Macro.Save({ Name: name, Overwrite: true }, content);
+        await this.xapi.Command.Macros.Macro.Save({ Name: name, Overwrite: true, transpile: false }, content);
     }
     async create(name, content = '') {
-        await this.xapi.Command.Macros.Macro.Save({ Name: name, Overwrite: false, Transpile: true }, content);
+        await this.xapi.Command.Macros.Macro.Save({ Name: name, Overwrite: false, Transpile: false }, content);
     }
     async delete(name) {
         // Back-compat: route delete to Remove

@@ -2,7 +2,7 @@
   "name": "roomos-macros-extension",
   "displayName": "Macros Virtual Filesystem for Cisco Codecs",
   "description": "Edit Cisco codec macros directly from VS Code",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "publisher": "ZacharieGignac",
   "license": "MIT",
   "icon": "images/icon.png",

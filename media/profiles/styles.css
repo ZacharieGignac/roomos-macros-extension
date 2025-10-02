@@ -25,4 +25,17 @@ th.col-active, td.col-active { text-align: center; }
 .schemaRow { display:flex; gap:8px; align-items:center; justify-content: space-between; }
 .schemaMeta { opacity: 0.8; font-size: 12px; }
 
+/* Prominent warning banner for serious limitations */
+.warningBanner {
+	display: block;
+	background: var(--vscode-inputValidation-errorBackground, rgba(255, 0, 0, 0.15));
+	color: var(--vscode-errorForeground, #ffcccc);
+	border: 1px solid var(--vscode-inputValidation-errorBorder, #be1100);
+	border-left-width: 4px;
+	padding: 10px 12px;
+	border-radius: 4px;
+	margin: 8px 0 14px;
+}
+.warningBanner strong { color: var(--vscode-errorForeground, #ff8080); }
+
 

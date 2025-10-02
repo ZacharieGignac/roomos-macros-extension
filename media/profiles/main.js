@@ -81,7 +81,7 @@ function add() {
   const host = document.getElementById('host').value;
   const username = document.getElementById('username').value;
   const password = document.getElementById('password').value;
-  const connectionMethod = document.getElementById('connectionMethod').value || 'ssh';
+  const connectionMethod = document.getElementById('connectionMethod').value || 'wss';
   if (!label || !host || !username || !password) { return; }
   vscode.postMessage({ type: 'add', label, host, username, password, connectionMethod });
   document.getElementById('password').value = '';
@@ -200,7 +200,9 @@ function render() {
       tdLabel.textContent = p.label;
       tdHost.textContent = p.host;
   tdUser.textContent = p.username;
-  tdMethod.textContent = (p.connectionMethod || 'ssh').toUpperCase();
+  // Indicate effective method; SSH is currently treated as WSS
+  const effective = (p.connectionMethod || 'wss').toUpperCase();
+  tdMethod.textContent = effective + ((p.connectionMethod === 'ssh') ? ' (WSS enforced)' : '');
       const btnEdit = document.createElement('button'); btnEdit.textContent = 'Edit'; btnEdit.addEventListener('click', () => { editing.add(p.id); render(); });
       const btnDel = document.createElement('button'); btnDel.textContent = 'Delete'; btnDel.addEventListener('click', () => delProfile(p.id));
       tdActions.appendChild(btnEdit); tdActions.appendChild(btnDel);

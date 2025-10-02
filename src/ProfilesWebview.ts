@@ -27,7 +27,8 @@ export class ProfilesWebview {
       try {
         const cfg = new CodecConfig();
         if (msg.type === 'add') {
-          await this.store.addProfile(msg.label, msg.host, msg.username, msg.password, msg.connectionMethod || 'ssh');
+          // Force default to WSS during temporary SSH bug period
+          await this.store.addProfile(msg.label, msg.host, msg.username, msg.password, msg.connectionMethod || 'wss');
         } else if (msg.type === 'setActive') {
           await this.store.setActiveProfileId(msg.id);
           await vscode.commands.executeCommand('ciscoCodec.reloadForActiveProfile');
@@ -323,6 +324,9 @@ export class ProfilesWebview {
 </head>
 <body>
   <h2>Settings</h2>
+  <div class="warningBanner">
+    <strong>Important:</strong> Due to a serious issue affecting saves over SSH, all connections are currently <strong>forced to WSS</strong> even if SSH is selected. SSH will be restored once the bug is fixed.
+  </div>
   <div class="section">
     <label style="display:flex;align-items:center;gap:6px;white-space:nowrap;">
       <input id="autoRestart" type="checkbox" />

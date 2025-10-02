@@ -326,7 +326,7 @@ async function activate(context) {
         await profiles.setActiveProfileId(activeId);
         const active = all.find(p => p.id === activeId);
         const pass = (await profiles.getPassword(active.id)) || '';
-        const manager = new MacroManager_1.MacroManager(active.host, active.username, pass, active.connectionMethod || 'ssh');
+        const manager = new MacroManager_1.MacroManager(active.host, active.username, pass, active.connectionMethod || 'wss');
         // Stream MacroManager debug logs to a dedicated Output channel
         const removeDebug = manager.onDebug((message, details) => {
             const ts = new Date().toISOString();
@@ -439,7 +439,7 @@ async function activate(context) {
                 await currentManager?.disconnect();
             }
             catch { }
-            const newManager = new MacroManager_1.MacroManager(selected.host, selected.username, password, selected.connectionMethod || 'ssh');
+            const newManager = new MacroManager_1.MacroManager(selected.host, selected.username, password, selected.connectionMethod || 'wss');
             const connected = await connectWithHandling(newManager, selected);
             if (!connected) {
                 // Keep using existing manager if connection failed
@@ -500,7 +500,7 @@ async function activate(context) {
                 try {
                     await profiles.updateProfile(profile.id, {}, newPassword);
                     const updatedPassword = (await profiles.getPassword(profile.id)) || '';
-                    const retryManager = new MacroManager_1.MacroManager(profile.host, profile.username, updatedPassword, profile.connectionMethod || 'ssh');
+                    const retryManager = new MacroManager_1.MacroManager(profile.host, profile.username, updatedPassword, profile.connectionMethod || 'wss');
                     await vscode.window.withProgress({ location: vscode.ProgressLocation.Window, title: `Reconnecting to ${profile.host}…` }, async () => {
                         await withTimeout(retryManager.connect(), 10000, 'connect');
                     });
@@ -787,10 +787,10 @@ async function promptAddProfile(profiles) {
     if (password === undefined)
         return;
     const methodPick = await vscode.window.showQuickPick([
-        { label: 'SSH (recommended)', value: 'ssh', description: 'Use SSH session for xAPI (default)' },
-        { label: 'WebSocket Secure (WSS)', value: 'wss', description: 'Use wss:// connection' }
-    ], { placeHolder: 'Select connection method', ignoreFocusOut: true });
-    const connectionMethod = (methodPick?.value === 'wss') ? 'wss' : 'ssh';
+        { label: 'WebSocket Secure (WSS) — temporary default', value: 'wss', description: 'All connections are currently treated as WSS due to an SSH save bug' },
+        { label: 'SSH', value: 'ssh', description: 'SSH will be treated as WSS until the bug is fixed' }
+    ], { placeHolder: 'Select connection method (WSS enforced for now)', ignoreFocusOut: true });
+    const connectionMethod = (methodPick?.value === 'ssh') ? 'ssh' : 'wss';
     return profiles.addProfile(label, host, username, password, connectionMethod);
 }
 function deactivate() { }

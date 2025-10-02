@@ -31,7 +31,7 @@ export class MacroManager {
     private host: string,
     private username: string,
     private password: string,
-    private connectionMethod: 'ssh' | 'wss' = 'ssh'
+    private connectionMethod: 'ssh' | 'wss' = 'wss'
   ) {}
 
   async connect(): Promise<void> {
@@ -39,8 +39,9 @@ export class MacroManager {
     this.reconnectScheduled = false;
     this.logDebug('connect() called');
     this.setState(this.state === 'disconnected' || this.state === 'idle' ? 'connecting' : 'reconnecting');
-    this.logDebug('attempting jsxapi connect', { host: this.host, username: this.username, method: this.connectionMethod });
-    const protocol = this.connectionMethod === 'wss' ? 'wss:' : 'ssh:';
+  this.logDebug('attempting jsxapi connect', { host: this.host, username: this.username, method: this.connectionMethod, note: 'forcing WSS due to temporary SSH bug' });
+  // Temporarily force WSS for all connections while SSH save bug is investigated
+  const protocol = 'wss:';
     const x = await connect({
       host: this.host,
       username: this.username,
@@ -70,14 +71,14 @@ export class MacroManager {
 
   async save(name: string, content: string): Promise<void> {
     await this.xapi.Command.Macros.Macro.Save(
-      { Name: name, Overwrite: true },
+      { Name: name, Overwrite: true, transpile: false },
       content
     );
   }
 
   async create(name: string, content: string = ''): Promise<void> {
     await this.xapi.Command.Macros.Macro.Save(
-      { Name: name, Overwrite: false, Transpile: true },
+      { Name: name, Overwrite: false, Transpile: false },
       content
     );
   }
