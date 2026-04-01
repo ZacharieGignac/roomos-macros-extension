@@ -33,6 +33,7 @@ class MacroManager {
         this.stateListeners = [];
         this.macroLogListeners = [];
         this.debugListeners = [];
+        this.connectionFailedListeners = [];
         this.probeTimer = null;
     }
     async connect() {
@@ -52,9 +53,45 @@ class MacroManager {
         this.logDebug('jsxapi connect resolved');
         this.attachXapi(x);
         this.xapi = x;
-        this.reconnectAttempts = 0;
-        this.reconnectScheduled = false;
-        // Do not set ready here; wait for xapi 'ready' event to ensure full readiness
+        await this.waitUntilReady(x);
+        // reconnectAttempts is reset in the xapi 'ready' event handler only
+    }
+    waitUntilReady(x) {
+        return new Promise((resolve, reject) => {
+            const emitter = x;
+            let settled = false;
+            const done = (fn) => {
+                if (settled)
+                    return;
+                settled = true;
+                try {
+                    emitter.removeListener?.('ready', onReady);
+                    emitter.removeListener?.('error', onError);
+                    emitter.removeListener?.('close', onClose);
+                }
+                catch { }
+                fn();
+            };
+            const onReady = () => {
+                this.logDebug('connect() readiness confirmed');
+                done(() => resolve());
+            };
+            const onError = (err) => {
+                if (this.explicitDisconnect)
+                    return;
+                const message = typeof err === 'string' ? err : (err?.message || String(err));
+                done(() => reject(new Error(message)));
+            };
+            const onClose = (code, reason) => {
+                if (this.explicitDisconnect)
+                    return;
+                const reasonText = reason ? String(reason) : '';
+                done(() => reject(new Error(`Connection closed before ready${reasonText ? `: ${reasonText}` : ''}${code ? ` (code ${code})` : ''}`)));
+            };
+            emitter.on('ready', onReady);
+            emitter.on('error', onError);
+            emitter.on('close', onClose);
+        });
     }
     async list() {
         const res = await this.xapi.Command.Macros.Macro.Get({});
@@ -160,6 +197,23 @@ class MacroManager {
                 this.debugListeners.splice(idx, 1);
         };
     }
+    // Public subscription for connection failure notifications
+    onConnectionFailed(listener) {
+        this.connectionFailedListeners.push(listener);
+        return () => {
+            const idx = this.connectionFailedListeners.indexOf(listener);
+            if (idx >= 0)
+                this.connectionFailedListeners.splice(idx, 1);
+        };
+    }
+    notifyConnectionFailed(message) {
+        for (const fn of this.connectionFailedListeners) {
+            try {
+                fn(message);
+            }
+            catch { }
+        }
+    }
     attachXapi(x) {
         // Ensure previous timers are cleared
         if (this.reconnectTimer) {
@@ -216,6 +270,14 @@ class MacroManager {
             return;
         if (this.reconnectScheduled) {
             this.logDebug('reconnect already scheduled; skipping duplicate');
+            return;
+        }
+        // Stop trying if we have exceeded ~15 seconds of attempts (1+2+4+8 = 15s)
+        if (this.reconnectAttempts >= 4) {
+            this.logDebug('max reconnect attempts reached; giving up');
+            this.reconnectScheduled = false;
+            this.setState('disconnected');
+            this.notifyConnectionFailed('Max reconnection attempts reached. Please connect manually via the status bar or RoomOS settings.');
             return;
         }
         this.reconnectScheduled = true;

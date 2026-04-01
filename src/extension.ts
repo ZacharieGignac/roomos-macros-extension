@@ -26,6 +26,20 @@ export async function activate(context: vscode.ExtensionContext) {
   const macroLogService = new MacroLogService();
   const connectionDebugChannel = vscode.window.createOutputChannel('RoomOS Macro Connection');
   let dirtyTracker: DirtyMacroTracker | null = null;
+  let removeFailureListener: (() => void) | null = null;
+  const bindConnectionFailure = (manager: MacroManager) => {
+    if (removeFailureListener) {
+      removeFailureListener();
+      removeFailureListener = null;
+    }
+    removeFailureListener = manager.onConnectionFailed((message: string) => {
+      const failedProfileId = currentProfileId;
+      if (failedProfileId) {
+        void profiles.setSuspendedProfileId(failedProfileId);
+      }
+      vscode.window.showErrorMessage(`RoomOS: ${message}`);
+    });
+  };
   context.subscriptions.push({ dispose: () => statusBarService.dispose() }, { dispose: () => macroLogService.dispose() }, connectionDebugChannel);
   const getManagerOrWarn = (): MacroManager | null => {
     if (!currentManager) {
@@ -279,6 +293,12 @@ export async function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(
     vscode.commands.registerCommand('ciscoCodec.reloadForActiveProfile', reloadForActiveProfileHandler)
   );
+  context.subscriptions.push(
+    vscode.commands.registerCommand('ciscoCodec.reconnect', async () => {
+      await profiles.setSuspendedProfileId(undefined);
+      await reloadForActiveProfileHandler();
+    })
+  );
   // Only import profile from settings if values are explicitly set (not defaults)
   const hostInfo = config.inspect<string>('host');
   const userInfo = config.inspect<string>('username');
@@ -307,6 +327,7 @@ export async function activate(context: vscode.ExtensionContext) {
   if (all.length === 0) {
     vscode.window.showWarningMessage('No codec profiles configured. Use "Codec: Add Codec Profile" from the view toolbar.');
   } else {
+    const suspendedProfileId = await profiles.getSuspendedProfileId();
     const activeId = (await profiles.getActiveProfileId()) || all[0].id;
     await profiles.setActiveProfileId(activeId);
     const active = all.find(p => p.id === activeId)!;
@@ -332,12 +353,19 @@ export async function activate(context: vscode.ExtensionContext) {
       connectionDebugChannel.appendLine(`[${ts}] [${active.host}] ${message}${detailsText}`);
     });
     context.subscriptions.push({ dispose: () => removeDebug() });
+    bindConnectionFailure(manager);
     currentManager = manager;
     currentProfileId = active.id;
     statusBarService.bind(manager, active.label || active.host);
-    const connectedManager = await connectWithHandling(manager, active);
+    const shouldAutoConnect = suspendedProfileId !== active.id;
+    if (!shouldAutoConnect) {
+      vscode.window.showWarningMessage(`Auto-connect is paused for ${active.host}. Re-enable manually from Settings by activating this profile.`);
+    }
+    const connectedManager = shouldAutoConnect ? await connectWithHandling(manager, active, true) : null;
     if (connectedManager) {
+      await profiles.setSuspendedProfileId(undefined);
       currentManager = connectedManager;
+      bindConnectionFailure(connectedManager);
       vscode.window.showInformationMessage(`Connected to codec at ${active.host}`);
       statusBarService.bind(currentManager, active.label || active.host);
       macroLogService.bind(currentManager);
@@ -361,21 +389,27 @@ export async function activate(context: vscode.ExtensionContext) {
 
   // Dirty macro tracking handled by DirtyMacroTracker once tree provider is created
 
-  // Preload xAPI schema with a progress message, then register language features
-  await vscode.window.withProgress({ location: vscode.ProgressLocation.Window, title: 'Getting xAPI schema…' }, async () => {
-    await schemaService.preload();
-  });
+  // Register language features immediately; schema warmup runs in background to avoid activation stalls
   registerLanguageFeatures(context, schemaService);
 
-  // Apply forced product if set, otherwise detect from device
-  {
-    const fp = vscode.workspace.getConfiguration('codec').get<string>('forcedProduct', 'auto');
-    if (fp && fp !== 'auto') {
-      schemaService.setActiveProductInternal(fp);
-    } else {
-      await productDetector.setActiveProductFromCodec(currentManager);
+  // Warm up schema and product selection without blocking extension activation
+  void vscode.window.withProgress({ location: vscode.ProgressLocation.Window, title: 'Getting xAPI schema…' }, async () => {
+    try {
+      await withTimeout(schemaService.preload(), 10000, 'schema preload');
+    } catch (err: any) {
+      connectionDebugChannel.appendLine(`[${new Date().toISOString()}] schema preload failed: ${err?.message || String(err)}`);
     }
-  }
+    try {
+      const fp = vscode.workspace.getConfiguration('codec').get<string>('forcedProduct', 'auto');
+      if (fp && fp !== 'auto') {
+        schemaService.setActiveProductInternal(fp);
+      } else {
+        await withTimeout(productDetector.setActiveProductFromCodec(currentManager), 5000, 'product detection');
+      }
+    } catch (err: any) {
+      connectionDebugChannel.appendLine(`[${new Date().toISOString()}] product detection failed: ${err?.message || String(err)}`);
+    }
+  });
 
   
 
@@ -439,7 +473,9 @@ export async function activate(context: vscode.ExtensionContext) {
           // Keep using existing manager if connection failed
           return;
         }
+        await profiles.setSuspendedProfileId(undefined);
         const effectiveManager = connected;
+        bindConnectionFailure(effectiveManager);
         currentManager = effectiveManager;
         currentProfileId = selected.id;
         statusBarService.bind(effectiveManager, selected.label || selected.host);
@@ -477,7 +513,7 @@ export async function activate(context: vscode.ExtensionContext) {
       }
   }
 
-  async function connectWithHandling(manager: MacroManager, profile: CodecProfileInfo): Promise<MacroManager | null> {
+  async function connectWithHandling(manager: MacroManager, profile: CodecProfileInfo, isAutomaticConnection = false): Promise<MacroManager | null> {
     try {
       await vscode.window.withProgress({ location: vscode.ProgressLocation.Window, title: `Connecting to ${profile.host}…` }, async () => {
         await withTimeout(manager.connect(), 10000, 'connect');
@@ -505,6 +541,11 @@ export async function activate(context: vscode.ExtensionContext) {
         }
       }
       if (category === 'tls') {
+        if (isAutomaticConnection) {
+          try { await manager.disconnect(); } catch {}
+          vscode.window.showWarningMessage(`TLS certificate error connecting to ${profile.host}. Codec is offline or untrusted. Activate manually to reconnect.`);
+          return null;
+        }
         const choice = await vscode.window.showErrorMessage(
           `TLS certificate error connecting to ${profile.host}. Ensure the device has a valid certificate trusted by your system.`,
           'Retry',
@@ -525,6 +566,11 @@ export async function activate(context: vscode.ExtensionContext) {
         return null;
       }
       if (category === 'unreachable' || category === 'timeout') {
+        if (isAutomaticConnection) {
+          try { await manager.disconnect(); } catch {}
+          vscode.window.showWarningMessage(`Cannot reach ${profile.host}. Codec is offline. Activate manually to reconnect.`);
+          return null;
+        }
         const choice = await vscode.window.showErrorMessage(
           `Cannot reach ${profile.host}. Check hostname/IP, network/VPN, and firewall.`,
           'Retry',

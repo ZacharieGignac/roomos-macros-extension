@@ -11,6 +11,7 @@ export interface CodecProfileInfo {
 
 const PROFILES_KEY = 'codec.profiles';
 const ACTIVE_PROFILE_KEY = 'codec.activeProfileId';
+const SUSPENDED_PROFILE_KEY = 'codec.suspendedProfileId';
 const secretKey = (id: string) => `codec.password:${id}`;
 
 export class ProfileStore {
@@ -28,6 +29,14 @@ export class ProfileStore {
 
   async setActiveProfileId(id: string): Promise<void> {
     await this.context.globalState.update(ACTIVE_PROFILE_KEY, id);
+  }
+
+  async getSuspendedProfileId(): Promise<string | undefined> {
+    return this.context.globalState.get<string | undefined>(SUSPENDED_PROFILE_KEY);
+  }
+
+  async setSuspendedProfileId(id: string | undefined): Promise<void> {
+    await this.context.globalState.update(SUSPENDED_PROFILE_KEY, id ?? undefined);
   }
 
   async getPassword(id: string): Promise<string | undefined> {

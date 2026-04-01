@@ -11,7 +11,7 @@ export class StatusBarService {
     this.statusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
     this.statusBar.name = 'RoomOS Macros';
     this.statusBar.command = 'ciscoCodec.manageProfiles';
-    this.statusBar.text = '$(debug-disconnect) RoomOS: Disconnected';
+    this.statusBar.text = '$(debug-disconnect) RoomOS: Codec offline.';
     this.statusBar.tooltip = 'Manage codec profiles';
     this.statusBar.show();
   }
@@ -44,7 +44,7 @@ export class StatusBarService {
       this.statusBar.tooltip = `Reconnecting to ${name}`;
       setConnectedContext(false);
     } else if (state === 'disconnected') {
-      this.statusBar.text = '$(debug-disconnect) RoomOS: Disconnected';
+      this.statusBar.text = '$(debug-disconnect) RoomOS: Codec offline.';
       this.statusBar.tooltip = 'Manage codec profiles';
       setConnectedContext(false);
     } else if (state === 'error') {

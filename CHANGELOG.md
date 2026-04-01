@@ -4,6 +4,19 @@ All notable changes to this project will be documented in this file.
 
 The format is inspired by Keep a Changelog. Versions follow Semantic Versioning.
 
+## [0.6.3] - 2026-04-01
+
+## [0.6.2] - 2026-03-02
+
+### Added
+- Reconnect action in the RoomOS explorer title bar to manually re-enable and retry the active profile.
+- Connection-failure notification prompting manual re-enable after retry exhaustion.
+
+### Changed
+- Connection activation now waits for codec readiness before reporting connected state.
+- Automatic reconnect now stops after capped retries and transitions cleanly to offline state.
+- Extension activation startup no longer blocks Settings while schema/product warmup runs.
+
 ## [0.6.1] - 2025-10-02
 
 ### Changed
@@ -39,3 +52,5 @@ The format is inspired by Keep a Changelog. Versions follow Semantic Versioning.
 
 [0.6.0]: https://github.com/ZacharieGignac/roomos-macros-extension/releases/tag/v0.6.0
 [0.6.1]: https://github.com/ZacharieGignac/roomos-macros-extension/releases/tag/v0.6.1
+[0.6.2]: https://github.com/ZacharieGignac/roomos-macros-extension/releases/tag/v0.6.2
+[0.6.3]: https://github.com/ZacharieGignac/roomos-macros-extension/releases/tag/v0.6.3

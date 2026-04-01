@@ -12,6 +12,8 @@ https://marketplace.visualstudio.com/items?itemName=ZacharieGignac.roomos-macros
 - Browse, open, and edit device macros via a virtual filesystem (`codecfs:`)
 - Create, rename, remove, activate/deactivate macros
 - Profiles for multiple codecs (credentials stored securely)
+- Reconnect button in the explorer title bar for manual retry after connection failure
+- Resilient auto-reconnect with capped retries (stops cleanly instead of retrying forever)
 - xAPI-aware IntelliSense and quick stubs
 - Live macro logs in the Output panel
 
@@ -42,7 +44,8 @@ code --install-extension dist/Macros-Virtual-Filesystem-for-Cisco-Codecs-<versio
 ### Notes
 
 - Requires VS Code 1.75+ and Node.js 18+
-- SSH is the default connection; WSS can be configured per profile
+- WSS is currently forced for all connections while an SSH save bug is investigated
+- Connection method can be configured per profile; SSH selection is accepted but treated as WSS for now
 
 ### License
 

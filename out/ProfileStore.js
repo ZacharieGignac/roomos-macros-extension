@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.ProfileStore = void 0;
 const PROFILES_KEY = 'codec.profiles';
 const ACTIVE_PROFILE_KEY = 'codec.activeProfileId';
+const SUSPENDED_PROFILE_KEY = 'codec.suspendedProfileId';
 const secretKey = (id) => `codec.password:${id}`;
 class ProfileStore {
     constructor(context) {
@@ -18,6 +19,12 @@ class ProfileStore {
     }
     async setActiveProfileId(id) {
         await this.context.globalState.update(ACTIVE_PROFILE_KEY, id);
+    }
+    async getSuspendedProfileId() {
+        return this.context.globalState.get(SUSPENDED_PROFILE_KEY);
+    }
+    async setSuspendedProfileId(id) {
+        await this.context.globalState.update(SUSPENDED_PROFILE_KEY, id ?? undefined);
     }
     async getPassword(id) {
         return this.context.secrets.get(secretKey(id));

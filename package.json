@@ -2,7 +2,7 @@
   "name": "roomos-macros-extension",
   "displayName": "Macros Virtual Filesystem for Cisco Codecs",
   "description": "Edit Cisco codec macros directly from VS Code",
-  "version": "0.6.1",
+  "version": "0.6.3",
   "publisher": "ZacharieGignac",
   "license": "MIT",
   "icon": "images/icon.png",
@@ -107,6 +107,10 @@
         "title": "Settings"
       },
       {
+        "command": "ciscoCodec.reconnect",
+        "title": "Reconnect"
+      },
+      {
         "command": "ciscoCodec.resetExtensionData",
         "title": "Codec: Reset Extension Data"
       },
@@ -157,6 +161,11 @@
           "command": "ciscoCodec.manageProfiles",
           "when": "view == codecMacrosExplorer",
           "group": "navigation@0"
+        },
+        {
+          "command": "ciscoCodec.reconnect",
+          "when": "view == codecMacrosExplorer",
+          "group": "navigation@1"
         }
       ],
       "editor/context": [
