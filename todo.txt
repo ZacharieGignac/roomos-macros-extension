@@ -1,0 +1,5 @@
+Next version;
+
+remove debug extension output
+local-folder sync
+download and upload macros
