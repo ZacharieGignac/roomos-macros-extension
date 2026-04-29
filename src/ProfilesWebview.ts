@@ -27,8 +27,7 @@ export class ProfilesWebview {
       try {
         const cfg = new CodecConfig();
         if (msg.type === 'add') {
-          // Force default to WSS during temporary SSH bug period
-          await this.store.addProfile(msg.label, msg.host, msg.username, msg.password, msg.connectionMethod || 'wss');
+          await this.store.addProfile(msg.label, msg.host, msg.username, msg.password);
         } else if (msg.type === 'setActive') {
           await this.store.setActiveProfileId(msg.id);
           await vscode.commands.executeCommand('ciscoCodec.reloadForActiveProfile');

@@ -5,8 +5,6 @@ export interface CodecProfileInfo {
   label: string;
   host: string;
   username: string;
-  /** Connection method: ssh (default) or wss */
-  connectionMethod?: 'ssh' | 'wss';
 }
 
 const PROFILES_KEY = 'codec.profiles';
@@ -18,9 +16,9 @@ export class ProfileStore {
   constructor(private context: vscode.ExtensionContext) {}
 
   async listProfiles(): Promise<CodecProfileInfo[]> {
-    const stored = this.context.globalState.get<CodecProfileInfo[]>(PROFILES_KEY, []);
-    // Backward compat: older profiles lack connectionMethod; temporarily default to 'wss' while SSH bug is addressed
-    return stored.map(p => ({ ...p, connectionMethod: p.connectionMethod === 'ssh' ? 'ssh' : 'wss' }));
+    const stored = this.context.globalState.get<any[]>(PROFILES_KEY, []);
+    // Backward compat: strip any legacy connectionMethod field from old profiles
+    return stored.map(p => ({ id: p.id, label: p.label, host: p.host, username: p.username }));
   }
 
   async getActiveProfileId(): Promise<string | undefined> {
@@ -43,11 +41,11 @@ export class ProfileStore {
     return this.context.secrets.get(secretKey(id));
   }
 
-  async addProfile(label: string, host: string, username: string, password: string, connectionMethod: 'ssh' | 'wss' = 'wss'): Promise<CodecProfileInfo> {
+  async addProfile(label: string, host: string, username: string, password: string): Promise<CodecProfileInfo> {
     const id = `${host}|${username}`;
     const profiles = await this.listProfiles();
     const exists = profiles.find(p => p.id === id);
-    const profile: CodecProfileInfo = { id, label, host, username, connectionMethod };
+    const profile: CodecProfileInfo = { id, label, host, username };
     const next = exists
       ? profiles.map(p => (p.id === id ? profile : p))
       : [...profiles, profile];
@@ -69,7 +67,7 @@ export class ProfileStore {
 
   async updateProfile(
     originalId: string,
-    updates: Partial<Omit<CodecProfileInfo, 'id'>> & { label?: string; host?: string; username?: string; connectionMethod?: 'ssh' | 'wss' },
+    updates: Partial<Omit<CodecProfileInfo, 'id'>> & { label?: string; host?: string; username?: string },
     newPassword?: string
   ): Promise<CodecProfileInfo> {
     const profiles = await this.listProfiles();
@@ -81,9 +79,7 @@ export class ProfileStore {
       ...existing,
       label: updates.label ?? existing.label,
       host: updates.host ?? existing.host,
-      username: updates.username ?? existing.username,
-      // Prefer WSS by default during SSH bug period
-      connectionMethod: updates.connectionMethod ?? existing.connectionMethod ?? 'wss'
+      username: updates.username ?? existing.username
     };
     const newId = `${updated.host}|${updated.username}`;
     updated.id = newId;

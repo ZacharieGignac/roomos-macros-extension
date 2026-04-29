@@ -2,7 +2,7 @@
   "name": "roomos-macros-extension",
   "displayName": "Macros Virtual Filesystem for Cisco Codecs",
   "description": "Edit Cisco codec macros directly from VS Code",
-  "version": "0.6.3",
+  "version": "0.7.0",
   "publisher": "ZacharieGignac",
   "license": "MIT",
   "icon": "images/icon.png",
@@ -121,6 +121,10 @@
       {
         "command": "ciscoCodec.insertXapiStub",
         "title": "xAPI: Insert Stub"
+      },
+      {
+        "command": "ciscoCodec.showWhatsNew",
+        "title": "RoomOS Macros: What's New"
       }
     ],
     "menus": {
@@ -132,17 +136,17 @@
         },
         {
           "command": "ciscoCodec.restartMacroFramework",
-          "when": "view == codecMacrosExplorer",
+          "when": "view == codecMacrosExplorer && (viewItem == macro:actions || !viewItem)",
           "group": "0_restart@0"
         },
         {
           "command": "ciscoCodec.renameMacro",
-          "when": "view == codecMacrosExplorer && viewItem =~ /macro:.*/",
+          "when": "view == codecMacrosExplorer && viewItem =~ /macro:(active|inactive)/",
           "group": "2_modification"
         },
         {
           "command": "ciscoCodec.deleteMacro",
-          "when": "view == codecMacrosExplorer && viewItem =~ /macro:.*/",
+          "when": "view == codecMacrosExplorer && viewItem =~ /macro:(active|inactive)/",
           "group": "2_modification"
         },
         {
@@ -166,6 +170,16 @@
           "command": "ciscoCodec.reconnect",
           "when": "view == codecMacrosExplorer",
           "group": "navigation@1"
+        },
+        {
+          "command": "ciscoCodec.createMacro",
+          "when": "view == codecMacrosExplorer",
+          "group": "1_actions@1"
+        },
+        {
+          "command": "ciscoCodec.restartMacroFramework",
+          "when": "view == codecMacrosExplorer",
+          "group": "1_actions@2"
         }
       ],
       "editor/context": [

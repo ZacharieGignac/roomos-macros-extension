@@ -16,6 +16,7 @@ const MacroLogService_1 = require("./extension/MacroLogService");
 const DirtyMacroTracker_1 = require("./extension/DirtyMacroTracker");
 const ProductDetectionService_1 = require("./extension/ProductDetectionService");
 const SchemaPathResolver_1 = require("./extension/SchemaPathResolver");
+const WhatsNewService_1 = require("./extension/WhatsNewService");
 async function activate(context) {
     const profiles = new ProfileStore_1.ProfileStore(context);
     const config = vscode.workspace.getConfiguration('codec');
@@ -65,7 +66,14 @@ async function activate(context) {
         if (!editor || editor.document.uri.scheme !== 'codecfs')
             return;
         const pos = editor.selection.active;
-        const linePrefix = editor.document.getText(new vscode.Range(pos.line, 0, pos.line, Number.MAX_SAFE_INTEGER)).slice(0, pos.character);
+        // Get the complete xAPI path at cursor position (works with cursor anywhere in the path)
+        const wordRange = (0, XapiLanguage_1.getWordRangeAt)(editor.document, pos);
+        if (!wordRange) {
+            vscode.window.showInformationMessage('Place the cursor on an xapi path like xapi.Command.Audio.');
+            return;
+        }
+        // Get text from line start to end of the word range (includes array notation like [1])
+        const linePrefix = editor.document.getText(new vscode.Range(wordRange.start.line, 0, wordRange.start.line, wordRange.end.character));
         const ctx = (0, XapiLanguage_1.parseXapiContext)(linePrefix);
         if (!ctx?.found || !ctx?.category) {
             vscode.window.showInformationMessage('Place the cursor on an xapi path like xapi.Command.Audio.');
@@ -104,24 +112,30 @@ async function activate(context) {
         else {
             snippet = `// xapi ${basePath}`;
         }
-        // Replace the current xapi path token if present; otherwise insert at cursor
-        const lineText = editor.document.lineAt(pos.line).text;
-        const uptoCursor = lineText.slice(0, pos.character);
-        const startIdx = uptoCursor.lastIndexOf('xapi.');
-        if (startIdx >= 0) {
-            const replaceRange = new vscode.Range(pos.line, startIdx, pos.line, pos.character);
-            await editor.insertSnippet(new vscode.SnippetString(snippet), replaceRange);
-        }
-        else {
-            await editor.insertSnippet(new vscode.SnippetString(snippet), editor.selection.start);
-        }
+        // Insert stub on a new line below the current line with proper indentation
+        const currentLine = editor.document.lineAt(pos.line);
+        const currentLineText = currentLine.text;
+        const indentMatch = currentLineText.match(/^\s*/);
+        const indent = indentMatch ? indentMatch[0] : '';
+        // Position at the end of the current line
+        const endOfLinePos = new vscode.Position(pos.line, currentLine.text.length);
+        // Insert newline + indentation + snippet
+        const snippetWithNewline = new vscode.SnippetString(`\n${indent}${snippet}`);
+        await editor.insertSnippet(snippetWithNewline, endOfLinePos);
     }));
     context.subscriptions.push(vscode.commands.registerCommand('ciscoCodec.showXapiHelp', async () => {
         const editor = vscode.window.activeTextEditor;
         if (!editor || editor.document.uri.scheme !== 'codecfs')
             return;
         const pos = editor.selection.active;
-        const linePrefix = editor.document.getText(new vscode.Range(pos.line, 0, pos.line, Number.MAX_SAFE_INTEGER)).slice(0, pos.character);
+        // Get the complete xAPI path at cursor position (works with cursor anywhere in the path)
+        const wordRange = (0, XapiLanguage_1.getWordRangeAt)(editor.document, pos);
+        if (!wordRange) {
+            vscode.window.showInformationMessage('Place the cursor on an xapi path like xapi.Command.Audio.');
+            return;
+        }
+        // Get text from line start to end of the word range (includes array notation like [1])
+        const linePrefix = editor.document.getText(new vscode.Range(wordRange.start.line, 0, wordRange.start.line, wordRange.end.character));
         // Reuse language parse to find context
         const ctx = (0, XapiLanguage_1.parseXapiContext)(linePrefix);
         if (!ctx?.found || !ctx?.category) {
@@ -345,7 +359,7 @@ async function activate(context) {
         await profiles.setActiveProfileId(activeId);
         const active = all.find(p => p.id === activeId);
         const pass = (await profiles.getPassword(active.id)) || '';
-        const manager = new MacroManager_1.MacroManager(active.host, active.username, pass, active.connectionMethod || 'wss');
+        const manager = new MacroManager_1.MacroManager(active.host, active.username, pass);
         // Stream MacroManager debug logs to a dedicated Output channel
         const removeDebug = manager.onDebug((message, details) => {
             const ts = new Date().toISOString();
@@ -402,6 +416,14 @@ async function activate(context) {
     // Dirty macro tracking handled by DirtyMacroTracker once tree provider is created
     // Register language features immediately; schema warmup runs in background to avoid activation stalls
     (0, XapiLanguage_1.registerLanguageFeatures)(context, schemaService);
+    // Show What's New page after updates (once per version)
+    const packageJson = context.extension.packageJSON;
+    const whatsNewService = new WhatsNewService_1.WhatsNewService(context, packageJson.version);
+    context.subscriptions.push(vscode.commands.registerCommand('ciscoCodec.showWhatsNew', async () => {
+        await whatsNewService.showWhatsNew();
+    }));
+    // Check and show What's New if version changed (non-blocking)
+    void whatsNewService.checkAndShow();
     // Warm up schema and product selection without blocking extension activation
     void vscode.window.withProgress({ location: vscode.ProgressLocation.Window, title: 'Getting xAPI schema…' }, async () => {
         try {
@@ -473,7 +495,7 @@ async function activate(context) {
                 await currentManager?.disconnect();
             }
             catch { }
-            const newManager = new MacroManager_1.MacroManager(selected.host, selected.username, password, selected.connectionMethod || 'wss');
+            const newManager = new MacroManager_1.MacroManager(selected.host, selected.username, password);
             const connected = await connectWithHandling(newManager, selected);
             if (!connected) {
                 // Keep using existing manager if connection failed
@@ -536,7 +558,7 @@ async function activate(context) {
                 try {
                     await profiles.updateProfile(profile.id, {}, newPassword);
                     const updatedPassword = (await profiles.getPassword(profile.id)) || '';
-                    const retryManager = new MacroManager_1.MacroManager(profile.host, profile.username, updatedPassword, profile.connectionMethod || 'wss');
+                    const retryManager = new MacroManager_1.MacroManager(profile.host, profile.username, updatedPassword);
                     await vscode.window.withProgress({ location: vscode.ProgressLocation.Window, title: `Reconnecting to ${profile.host}…` }, async () => {
                         await withTimeout(retryManager.connect(), 10000, 'connect');
                     });
@@ -673,7 +695,8 @@ async function activate(context) {
         if (!name)
             return;
         try {
-            await mgr.create(name, '');
+            const initialContent = 'import xapi from \'xapi\';\n\n';
+            await mgr.create(name, initialContent);
             vscode.window.showInformationMessage(`Created macro ${name}`);
             await treeProvider?.fetchMacros();
             const uri = vscode.Uri.parse(`codecfs:/${name}.js`);
@@ -838,12 +861,7 @@ async function promptAddProfile(profiles) {
     const password = await vscode.window.showInputBox({ prompt: 'Password', password: true });
     if (password === undefined)
         return;
-    const methodPick = await vscode.window.showQuickPick([
-        { label: 'WebSocket Secure (WSS) — temporary default', value: 'wss', description: 'All connections are currently treated as WSS due to an SSH save bug' },
-        { label: 'SSH', value: 'ssh', description: 'SSH will be treated as WSS until the bug is fixed' }
-    ], { placeHolder: 'Select connection method (WSS enforced for now)', ignoreFocusOut: true });
-    const connectionMethod = (methodPick?.value === 'ssh') ? 'ssh' : 'wss';
-    return profiles.addProfile(label, host, username, password, connectionMethod);
+    return profiles.addProfile(label, host, username, password);
 }
 function deactivate() { }
 //# sourceMappingURL=extension.js.map

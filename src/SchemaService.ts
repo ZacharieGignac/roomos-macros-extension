@@ -1,10 +1,32 @@
 import * as vscode from 'vscode';
 
+/**
+ * Schema index node representing a node in the xAPI schema tree.
+ * Supports efficient lookup for intellisense with array notation support.
+ */
 type SchemaIndexNode = {
   children: Record<string, SchemaIndexNode>;
-  meta?: any; // leaf metadata from latest schema object
+  meta?: SchemaMetadata; // leaf metadata from schema object
   products?: Set<string>; // union of products that include this node
 };
+
+/**
+ * Metadata for a schema node from the RoomOS API.
+ */
+interface SchemaMetadata {
+  description?: string;
+  help?: string;
+  access?: string;
+  role?: string[];
+  params?: any[];
+  type?: string;
+  products?: string[];
+  [key: string]: any; // Allow additional properties
+}
+
+/**
+ * Root schema index with four main categories.
+ */
 type SchemaIndex = {
   Command: SchemaIndexNode;
   Config: SchemaIndexNode;
@@ -92,7 +114,10 @@ export class SchemaService {
   }
 
   /**
-   * Fetch a node-specific schema, e.g., Command/Macros/Macro/Save
+   * Fetch a node-specific schema, e.g., "Command.Macros.Macro.Save"
+   * 
+   * Note: Array indices should be stripped from path segments before calling this method.
+   * For example: "Status.Call[1].Status" should be passed as "Status.Call.Status"
    */
   async getNodeSchema(path: string, versionKey: string = 'latest'): Promise<any | null> {
     const safe = path.replace(/^[.\/]+|[.\/]+$/g, '');
@@ -125,7 +150,12 @@ export class SchemaService {
   }
 
   /**
-   * Return a map of child name -> metadata for a given path (e.g., Command/Macros/Macro)
+   * Return a map of child name -> metadata for a given path (e.g., Command.Macros.Macro).
+   * 
+   * Note: Array indices should be stripped from path segments before calling this method.
+   * The XapiLanguage module handles this automatically. For example:
+   * - "Status.Audio.Input.Connectors.Line[1].Mute" should be called as "Status.Audio.Input.Connectors.Line"
+   * - The schema doesn't contain array-indexed nodes, only the base node names
    */
   async getChildrenMap(path: string): Promise<Record<string, any> | null> {
     const root = await this.getRootSchema();

@@ -25,7 +25,9 @@ class MacroTreeProvider {
         if (element) {
             return Promise.resolve([]);
         }
-        return Promise.resolve(this.macros);
+        // Always add an Actions item at the top for easy access to create/restart commands
+        const actionsItem = new MacroActionsItem();
+        return Promise.resolve([actionsItem, ...this.macros]);
     }
     async fetchMacros() {
         try {
@@ -67,6 +69,15 @@ class MacroItem extends vscode.TreeItem {
         this.contextValue = isActive ? 'macro:active' : 'macro:inactive';
         this.iconPath = new vscode.ThemeIcon('circle-filled', new vscode.ThemeColor(isActive ? 'testing.iconPassed' : 'testing.iconFailed'));
         this.description = isDirty ? 'unsaved' : undefined;
+    }
+}
+class MacroActionsItem extends vscode.TreeItem {
+    constructor() {
+        super('Actions (right-click)', vscode.TreeItemCollapsibleState.None);
+        this.tooltip = 'Right-click for macro actions';
+        this.contextValue = 'macro:actions';
+        this.iconPath = new vscode.ThemeIcon('ellipsis');
+        this.command = undefined; // No command when clicked directly
     }
 }
 //# sourceMappingURL=MacroTreeProvider.js.map

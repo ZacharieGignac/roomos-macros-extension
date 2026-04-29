@@ -1,6 +1,6 @@
 /* global acquireVsCodeApi */
 
-/** @typedef {{ id:string,label:string,host:string,username:string,connectionMethod:'ssh'|'wss' }} Profile */
+/** @typedef {{ id:string,label:string,host:string,username:string }} Profile */
 /** @typedef {{ code:string,label:string }} KnownProduct */
 
 const vscode = acquireVsCodeApi();
@@ -81,9 +81,8 @@ function add() {
   const host = document.getElementById('host').value;
   const username = document.getElementById('username').value;
   const password = document.getElementById('password').value;
-  const connectionMethod = document.getElementById('connectionMethod').value || 'wss';
   if (!label || !host || !username || !password) { return; }
-  vscode.postMessage({ type: 'add', label, host, username, password, connectionMethod });
+  vscode.postMessage({ type: 'add', label, host, username, password });
   document.getElementById('password').value = '';
 }
 
@@ -164,26 +163,22 @@ function render() {
     const tdHost = document.createElement('td');
     const tdUser = document.createElement('td');
   const tdActions = document.createElement('td'); tdActions.className = 'actions col-actions';
-  const tdMethod = document.createElement('td');
 
     if (editing.has(p.id)) {
       const inLabel = document.createElement('input'); inLabel.value = p.label; inLabel.size = 16;
       const inHost = document.createElement('input'); inHost.value = p.host; inHost.size = 16;
       const inUser = document.createElement('input'); inUser.value = p.username; inUser.size = 12;
   const inPass = document.createElement('input'); inPass.type = 'password'; inPass.placeholder = 'Leave blank to keep'; inPass.size = 16;
-  const selMethod = document.createElement('select');
-  ['ssh','wss'].forEach(m => { const opt=document.createElement('option'); opt.value=m; opt.textContent=m.toUpperCase(); if((p.connectionMethod||'ssh')===m) opt.selected=true; selMethod.appendChild(opt); });
       [inLabel, inHost, inUser, inPass].forEach(el => el.classList.add('inputs-inline'));
       const radio = document.createElement('input'); radio.type = 'radio'; radio.name = 'active'; radio.checked = state.activeId === p.id; radio.disabled = true; radio.title = 'Active profile';
       tdActive.appendChild(radio);
       tdLabel.appendChild(inLabel);
       tdHost.appendChild(inHost);
   tdUser.appendChild(inUser);
-  tdMethod.appendChild(selMethod);
 
       const btnSave = document.createElement('button'); btnSave.textContent = 'Save';
       btnSave.addEventListener('click', () => {
-        const updates = { label: inLabel.value, host: inHost.value, username: inUser.value, connectionMethod: selMethod.value };
+        const updates = { label: inLabel.value, host: inHost.value, username: inUser.value };
         const password = inPass.value === '' ? undefined : inPass.value;
         vscode.postMessage({ type: 'update', originalId: p.id, updates, password });
         editing.delete(p.id);
@@ -200,15 +195,12 @@ function render() {
       tdLabel.textContent = p.label;
       tdHost.textContent = p.host;
   tdUser.textContent = p.username;
-  // Indicate effective method; SSH is currently treated as WSS
-  const effective = (p.connectionMethod || 'wss').toUpperCase();
-  tdMethod.textContent = effective + ((p.connectionMethod === 'ssh') ? ' (WSS enforced)' : '');
       const btnEdit = document.createElement('button'); btnEdit.textContent = 'Edit'; btnEdit.addEventListener('click', () => { editing.add(p.id); render(); });
       const btnDel = document.createElement('button'); btnDel.textContent = 'Delete'; btnDel.addEventListener('click', () => delProfile(p.id));
       tdActions.appendChild(btnEdit); tdActions.appendChild(btnDel);
     }
 
-  tr.appendChild(tdActive); tr.appendChild(tdLabel); tr.appendChild(tdHost); tr.appendChild(tdUser); tr.appendChild(tdMethod); tr.appendChild(tdActions);
+  tr.appendChild(tdActive); tr.appendChild(tdLabel); tr.appendChild(tdHost); tr.appendChild(tdUser); tr.appendChild(tdActions);
     tbody.appendChild(tr);
   }
 

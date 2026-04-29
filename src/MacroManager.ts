@@ -31,8 +31,7 @@ export class MacroManager {
   constructor(
     private host: string,
     private username: string,
-    private password: string,
-    private connectionMethod: 'ssh' | 'wss' = 'wss'
+    private password: string
   ) {}
 
   async connect(): Promise<void> {
@@ -40,8 +39,7 @@ export class MacroManager {
     this.reconnectScheduled = false;
     this.logDebug('connect() called');
     this.setState(this.state === 'disconnected' || this.state === 'idle' ? 'connecting' : 'reconnecting');
-  this.logDebug('attempting jsxapi connect', { host: this.host, username: this.username, method: this.connectionMethod, note: 'forcing WSS due to temporary SSH bug' });
-  // Temporarily force WSS for all connections while SSH save bug is investigated
+  this.logDebug('attempting jsxapi connect', { host: this.host, username: this.username, protocol: 'wss' });
   const protocol = 'wss:';
     const x = await connect({
       host: this.host,

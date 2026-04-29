@@ -11,8 +11,8 @@ class ProfileStore {
     }
     async listProfiles() {
         const stored = this.context.globalState.get(PROFILES_KEY, []);
-        // Backward compat: older profiles lack connectionMethod; temporarily default to 'wss' while SSH bug is addressed
-        return stored.map(p => ({ ...p, connectionMethod: p.connectionMethod === 'ssh' ? 'ssh' : 'wss' }));
+        // Backward compat: strip any legacy connectionMethod field from old profiles
+        return stored.map(p => ({ id: p.id, label: p.label, host: p.host, username: p.username }));
     }
     async getActiveProfileId() {
         return this.context.globalState.get(ACTIVE_PROFILE_KEY);
@@ -29,11 +29,11 @@ class ProfileStore {
     async getPassword(id) {
         return this.context.secrets.get(secretKey(id));
     }
-    async addProfile(label, host, username, password, connectionMethod = 'wss') {
+    async addProfile(label, host, username, password) {
         const id = `${host}|${username}`;
         const profiles = await this.listProfiles();
         const exists = profiles.find(p => p.id === id);
-        const profile = { id, label, host, username, connectionMethod };
+        const profile = { id, label, host, username };
         const next = exists
             ? profiles.map(p => (p.id === id ? profile : p))
             : [...profiles, profile];
@@ -61,9 +61,7 @@ class ProfileStore {
             ...existing,
             label: updates.label ?? existing.label,
             host: updates.host ?? existing.host,
-            username: updates.username ?? existing.username,
-            // Prefer WSS by default during SSH bug period
-            connectionMethod: updates.connectionMethod ?? existing.connectionMethod ?? 'wss'
+            username: updates.username ?? existing.username
         };
         const newId = `${updated.host}|${updated.username}`;
         updated.id = newId;

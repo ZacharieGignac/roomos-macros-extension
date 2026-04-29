@@ -20,11 +20,10 @@ class MacroManager {
             catch { }
         }
     }
-    constructor(host, username, password, connectionMethod = 'wss') {
+    constructor(host, username, password) {
         this.host = host;
         this.username = username;
         this.password = password;
-        this.connectionMethod = connectionMethod;
         this.state = 'idle';
         this.reconnectAttempts = 0;
         this.reconnectTimer = null;
@@ -41,8 +40,7 @@ class MacroManager {
         this.reconnectScheduled = false;
         this.logDebug('connect() called');
         this.setState(this.state === 'disconnected' || this.state === 'idle' ? 'connecting' : 'reconnecting');
-        this.logDebug('attempting jsxapi connect', { host: this.host, username: this.username, method: this.connectionMethod, note: 'forcing WSS due to temporary SSH bug' });
-        // Temporarily force WSS for all connections while SSH save bug is investigated
+        this.logDebug('attempting jsxapi connect', { host: this.host, username: this.username, protocol: 'wss' });
         const protocol = 'wss:';
         const x = await (0, jsxapi_1.connect)({
             host: this.host,

@@ -1,9 +1,9 @@
 import * as vscode from 'vscode';
 import { MacroManager } from './MacroManager';
 
-export class MacroTreeProvider implements vscode.TreeDataProvider<MacroItem> {
-    private _onDidChangeTreeData: vscode.EventEmitter<MacroItem | undefined | void> = new vscode.EventEmitter<MacroItem | undefined | void>();
-    readonly onDidChangeTreeData: vscode.Event<MacroItem | undefined | void> = this._onDidChangeTreeData.event;
+export class MacroTreeProvider implements vscode.TreeDataProvider<MacroItem | MacroActionsItem> {
+    private _onDidChangeTreeData: vscode.EventEmitter<MacroItem | MacroActionsItem | undefined | void> = new vscode.EventEmitter<MacroItem | MacroActionsItem | undefined | void>();
+    readonly onDidChangeTreeData: vscode.Event<MacroItem | MacroActionsItem | undefined | void> = this._onDidChangeTreeData.event;
 
     private macros: MacroItem[] = [];
     private dirtySet: Set<string> = new Set();
@@ -21,15 +21,17 @@ export class MacroTreeProvider implements vscode.TreeDataProvider<MacroItem> {
         this._onDidChangeTreeData.fire();
     }
 
-    getTreeItem(element: MacroItem): vscode.TreeItem {
+    getTreeItem(element: MacroItem | MacroActionsItem): vscode.TreeItem {
         return element;
     }
 
-    getChildren(element?: MacroItem): Thenable<MacroItem[]> {
+    getChildren(element?: MacroItem | MacroActionsItem): Thenable<(MacroItem | MacroActionsItem)[]> {
         if (element) {
             return Promise.resolve([]);
         }
-        return Promise.resolve(this.macros);
+        // Always add an Actions item at the top for easy access to create/restart commands
+        const actionsItem = new MacroActionsItem();
+        return Promise.resolve([actionsItem, ...this.macros]);
     }
 
     public async fetchMacros() {
@@ -73,5 +75,15 @@ class MacroItem extends vscode.TreeItem {
         this.contextValue = isActive ? 'macro:active' : 'macro:inactive';
         this.iconPath = new vscode.ThemeIcon('circle-filled', new vscode.ThemeColor(isActive ? 'testing.iconPassed' : 'testing.iconFailed'));
         this.description = isDirty ? 'unsaved' : undefined;
+    }
+}
+
+class MacroActionsItem extends vscode.TreeItem {
+    constructor() {
+        super('Actions (right-click)', vscode.TreeItemCollapsibleState.None);
+        this.tooltip = 'Right-click for macro actions';
+        this.contextValue = 'macro:actions';
+        this.iconPath = new vscode.ThemeIcon('ellipsis');
+        this.command = undefined; // No command when clicked directly
     }
 }
